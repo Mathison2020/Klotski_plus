@@ -2,7 +2,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* 从旧版 @weavelynx/ui 独立移植的语义 token 映射。 */
+/* 应用使用的语义色彩与圆角 token 映射。 */
 @theme inline {
   --font-sans: var(
     --app-font-sans,
