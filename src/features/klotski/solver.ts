@@ -79,6 +79,18 @@ const GROUPS = [
   { w: 1, h: 1, count: 4, offset: 30n },
 ] as const;
 
+/** 紧凑编码只适用于一横将、四竖将、四卒的传统棋子组合。 */
+function supportsCompactEncoding(pieces: Piece[]): boolean {
+  if (pieces.length !== GROUPS.reduce((total, group) => total + group.count, 0)) return false;
+  return GROUPS.every(
+    (group) =>
+      pieces.filter((piece) => {
+        const size = getSize(piece);
+        return size.w === group.w && size.h === group.h;
+      }).length === group.count,
+  );
+}
+
 /** 曹操左上角应到达 (1,3) 时的位置值。 */
 const CAO_POS_VALUE = 3 * COLS + 1;
 /** 曹操块占位的最低 offset 值，胜利判定只比较这一块。 */
@@ -299,7 +311,7 @@ function solveGeneric(input: Piece[]): SolverAction[] | null {
 /** 求华容道最短解；旋转/转角与沿单轴滑动任意距离均各算一步。 */
 export function solveKlotski(input: Piece[]): SolverAction[] | null {
   if (isWin(input)) return [];
-  if (input.some((p) => p.type === PieceType.HALF_DISC || p.type === PieceType.HANDSET)) {
+  if (!supportsCompactEncoding(input)) {
     return solveGeneric(input);
   }
 
