@@ -81,6 +81,9 @@ const GROUPS = [
 
 /** 紧凑编码只适用于一横将、四竖将、四卒的传统棋子组合。 */
 function supportsCompactEncoding(pieces: Piece[]): boolean {
+  if (pieces.some((piece) => piece.type === PieceType.HALF_DISC || piece.type === PieceType.HANDSET)) {
+    return false;
+  }
   if (pieces.length !== GROUPS.reduce((total, group) => total + group.count, 0)) return false;
   return GROUPS.every(
     (group) =>
