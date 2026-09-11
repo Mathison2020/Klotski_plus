@@ -85,6 +85,10 @@ export const QI_TOU_BING_JIN = decodeClassicLayout('齐头并进', '351311112222
 export const BING_FEN_SAN_LU = decodeClassicLayout('兵分三路', '25123113122134131001');
 export const YI_LU_SHUN_FENG = decodeClassicLayout('一路顺风', '35121112341312310210');
 export const JIANG_SHOU_JIAO_LOU = decodeClassicLayout('将守角楼', '35131111241232231001');
+export const CENG_CENG_SHE_FANG = decodeClassicLayout(
+  '层层设防',
+  '35131111241224120410',
+);
 
 /**
  * 半圆试玩 —— 由“横刀立马”把左上竖将替换为半圆。
@@ -138,6 +142,7 @@ export const LAYOUTS: Layout[] = [
   BING_FEN_SAN_LU,
   YI_LU_SHUN_FENG,
   JIANG_SHOU_JIAO_LOU,
+  CENG_CENG_SHE_FANG,
   HALF_DISC_SANDBOX,
   HANDSET_SANDBOX,
 ];
