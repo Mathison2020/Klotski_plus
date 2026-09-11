@@ -1,0 +1,147 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { ButtonHTMLAttributes, OptionHTMLAttributes, SelectHTMLAttributes } from 'react';
+import { KlotskiPage } from '../KlotskiPage';
+
+// 手势测试使用专用稀疏棋局，避免正式关卡的难度调整改变拖动坐标；
+// 正式预设的密度、可解性和旋转动作由 solver.test.ts 覆盖。
+vi.mock('../layouts', () => ({
+  LAYOUTS: [
+    {
+      name: '半圆试玩',
+      pieces: [
+        { id: 'caocao', type: 'caocao', x: 1, y: 0 },
+        { id: 'guanyu', type: 'general-h', x: 1, y: 2 },
+        { id: 'half', type: 'half-disc', x: 1, y: 4, orientation: 'down' },
+        { id: 'zhangfei', type: 'general-v', x: 0, y: 1 },
+        { id: 'zu1', type: 'soldier', x: 2, y: 3 },
+        { id: 'zu2', type: 'soldier', x: 3, y: 4 },
+      ],
+    },
+    {
+      name: '听筒转角',
+      pieces: [
+        { id: 'caocao', type: 'caocao', x: 1, y: 0 },
+        { id: 'guanyu', type: 'general-h', x: 1, y: 2 },
+        { id: 'handset', type: 'handset', x: 1, y: 4, handsetOrientation: 'up' },
+        { id: 'zhangfei', type: 'general-v', x: 0, y: 1 },
+        { id: 'zu1', type: 'soldier', x: 2, y: 3 },
+      ],
+    },
+  ],
+}));
+
+function selectLayout(name: string) {
+  const option = screen.getByRole('option', { name }) as HTMLOptionElement;
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: option.value } });
+}
+
+vi.mock('@/components/ui', () => ({
+  Button: ({
+    size: _size,
+    variant: _variant,
+    ...props
+  }: ButtonHTMLAttributes<HTMLButtonElement> & { size?: string; variant?: string }) => (
+    <button {...props} />
+  ),
+  NativeSelect: (props: SelectHTMLAttributes<HTMLSelectElement>) => <select {...props} />,
+  NativeSelectOption: (props: OptionHTMLAttributes<HTMLOptionElement>) => <option {...props} />,
+  Slider: () => <input aria-label="演示进度" type="range" disabled />,
+}));
+
+describe('半圆块交互', () => {
+  beforeEach(() => {
+    Object.defineProperty(HTMLElement.prototype, 'setPointerCapture', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      bottom: 500,
+      height: 500,
+      left: 0,
+      right: 400,
+      top: 0,
+      width: 400,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  test('在半圆上按住右键环绕拖动后吸附到下一朝向', () => {
+    render(<KlotskiPage />);
+    selectLayout('半圆试玩');
+
+    // 先把挡在半圆右上方的卒向右移开。
+    const soldier = screen.getByTestId('piece-zu1');
+    fireEvent.pointerDown(soldier, { button: 0, clientX: 250, clientY: 350, pointerId: 1 });
+    fireEvent.pointerMove(soldier, { button: 0, clientX: 350, clientY: 350, pointerId: 1 });
+    fireEvent.pointerUp(soldier, { button: 0, clientX: 350, clientY: 350, pointerId: 1 });
+
+    const half = screen.getByLabelText('半圆块');
+    // 初始圆心为棋盘坐标 (2,4)，从圆心右侧拖到上侧即逆时针 90°。
+    fireEvent.pointerDown(half, { button: 2, clientX: 250, clientY: 400, pointerId: 2 });
+    fireEvent.pointerMove(half, { button: 2, clientX: 200, clientY: 350, pointerId: 2 });
+    expect(half.style.transform).toBe('rotate(0deg)');
+
+    fireEvent.pointerUp(half, { button: 2, clientX: 200, clientY: 350, pointerId: 2 });
+    expect(screen.getByLabelText('半圆块').style.transform).toBe('rotate(0deg)');
+    expect(screen.getByText(/步数 2/)).toBeTruthy();
+  });
+
+  test('页面统一禁用浏览器右键菜单', () => {
+    render(<KlotskiPage />);
+    expect(fireEvent.contextMenu(screen.getByRole('heading', { name: '华容道' }))).toBe(false);
+  });
+
+  test.each([125, 250, 375])('听筒任意横向位置（x=%i）都可开始右键转角', (pointerX) => {
+    render(<KlotskiPage />);
+    selectLayout('听筒转角');
+
+    const handset = screen.getByLabelText('电话听筒块');
+    fireEvent.pointerDown(handset, { button: 2, clientX: pointerX, clientY: 450, pointerId: 5 });
+    fireEvent.pointerMove(handset, { button: 2, clientX: pointerX, clientY: 350, pointerId: 5 });
+    fireEvent.pointerUp(handset, { button: 2, clientX: pointerX, clientY: 350, pointerId: 5 });
+
+    expect(screen.getByLabelText('电话听筒块').style.transform).toBe('rotate(-90deg)');
+    expect(screen.getByText(/步数 1/)).toBeTruthy();
+  });
+
+  test('听筒右键拖动转角后仍可左键平移', () => {
+    render(<KlotskiPage />);
+    selectLayout('听筒转角');
+
+    let handset = screen.getByLabelText('电话听筒块');
+    // 向上拖右端转入右侧通道。中心从 (2.5, 4.5) 出发，
+    // 半程时内墙角到达凹口最深处，听筒中心位于 (3, 4)。
+    fireEvent.pointerDown(handset, { button: 2, clientX: 375, clientY: 450, pointerId: 3 });
+    fireEvent.pointerMove(handset, { button: 2, clientX: 375, clientY: 400, pointerId: 3 });
+    expect(handset.style.transform).toBe('rotate(-45deg)');
+    expect(handset.style.left).toBe('37.5%');
+    expect(handset.style.top).toBe('70%');
+
+    fireEvent.pointerMove(handset, { button: 2, clientX: 375, clientY: 350, pointerId: 3 });
+    expect(handset.style.transform).toBe('rotate(-90deg)');
+    expect(handset.style.left).toBe('50%');
+    expect(handset.style.top).toBe('60%');
+
+    fireEvent.pointerUp(handset, { button: 2, clientX: 375, clientY: 350, pointerId: 3 });
+    handset = screen.getByLabelText('电话听筒块');
+    expect(handset.style.transform).toBe('rotate(-90deg)');
+    expect(handset.style.left).toBe('50%');
+    expect(handset.style.top).toBe('60%');
+    expect(screen.getByText(/步数 1/)).toBeTruthy();
+
+    // 转成竖向后继续使用普通左键拖动上移一格。
+    fireEvent.pointerDown(handset, { button: 0, clientX: 350, clientY: 350, pointerId: 4 });
+    fireEvent.pointerMove(handset, { button: 0, clientX: 350, clientY: 250, pointerId: 4 });
+    fireEvent.pointerUp(handset, { button: 0, clientX: 350, clientY: 250, pointerId: 4 });
+    expect(screen.getByLabelText('电话听筒块').style.top).toBe('40%');
+    expect(screen.getByText(/步数 2/)).toBeTruthy();
+  });
+});

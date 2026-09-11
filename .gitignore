@@ -1,0 +1,9 @@
+*.log
+node_modules/
+dist/
+*.local
+.idea
+.vscode
+.DS_Store
+*.tsbuildinfo
+coverage/
