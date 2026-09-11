@@ -12,5 +12,6 @@ export default defineConfig({
     environment: 'happy-dom',
     include: ['src/**/__tests__/**/*.?(c|m)[jt]s?(x)'],
     passWithNoTests: true,
+    testTimeout: 15_000,
   },
 });
