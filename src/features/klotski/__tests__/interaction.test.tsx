@@ -8,7 +8,7 @@ import { KlotskiPage } from '../KlotskiPage';
 vi.mock('../layouts', () => ({
   LAYOUTS: [
     {
-      name: '半圆试玩',
+      name: '峰回路转',
       pieces: [
         { id: 'caocao', type: 'caocao', x: 1, y: 0 },
         { id: 'guanyu', type: 'general-h', x: 1, y: 2 },
@@ -19,7 +19,7 @@ vi.mock('../layouts', () => ({
       ],
     },
     {
-      name: '听筒转角',
+      name: '辗转腾挪',
       pieces: [
         { id: 'caocao', type: 'caocao', x: 1, y: 0 },
         { id: 'guanyu', type: 'general-h', x: 1, y: 2 },
@@ -75,7 +75,7 @@ describe('半圆块交互', () => {
 
   test('在半圆上按住右键环绕拖动后吸附到下一朝向', () => {
     render(<KlotskiPage />);
-    selectLayout('半圆试玩');
+    selectLayout('峰回路转');
 
     // 先把挡在半圆右上方的卒向右移开。
     const soldier = screen.getByTestId('piece-zu1');
@@ -101,7 +101,7 @@ describe('半圆块交互', () => {
 
   test.each([125, 250, 375])('听筒任意横向位置（x=%i）都可开始右键转角', (pointerX) => {
     render(<KlotskiPage />);
-    selectLayout('听筒转角');
+    selectLayout('辗转腾挪');
 
     const handset = screen.getByLabelText('电话听筒块');
     fireEvent.pointerDown(handset, { button: 2, clientX: pointerX, clientY: 450, pointerId: 5 });
@@ -114,7 +114,7 @@ describe('半圆块交互', () => {
 
   test('听筒右键拖动转角后仍可左键平移', () => {
     render(<KlotskiPage />);
-    selectLayout('听筒转角');
+    selectLayout('辗转腾挪');
 
     let handset = screen.getByLabelText('电话听筒块');
     // 向上拖右端转入右侧通道。中心从 (2.5, 4.5) 出发，

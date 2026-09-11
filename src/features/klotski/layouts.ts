@@ -91,11 +91,11 @@ export const CENG_CENG_SHE_FANG = decodeClassicLayout(
 );
 
 /**
- * 半圆试玩 —— 由“横刀立马”把左上竖将替换为半圆。
+ * 峰回路转 —— 由“横刀立马”把左上竖将替换为半圆。
  * 仍保持传统布局的 18 格占用（仅两格空位）；最短解 37 步，必须旋转半圆 2 次。
  */
 export const HALF_DISC_SANDBOX: Layout = {
-  name: '半圆试玩',
+  name: '峰回路转',
   pieces: [
     { id: 'caocao', type: CAOCAO, x: 1, y: 0 },
     { id: 'guanyu', type: GENERAL_H, x: 1, y: 2 },
@@ -111,11 +111,11 @@ export const HALF_DISC_SANDBOX: Layout = {
 };
 
 /**
- * 听筒转角 —— 由“横刀立马”把左下竖将和其下方小卒合并为三格听筒。
+ * 辗转腾挪 —— 由“横刀立马”把左下竖将和其下方小卒合并为三格听筒。
  * 仅留下两格自由空间；最短解 81 步，其中必须完成 6 次转角动作。
  */
 export const HANDSET_SANDBOX: Layout = {
-  name: '听筒转角',
+  name: '辗转腾挪',
   pieces: [
     { id: 'caocao', type: CAOCAO, x: 1, y: 0 },
     { id: 'guanyu', type: GENERAL_H, x: 1, y: 2 },
