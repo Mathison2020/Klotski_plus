@@ -168,10 +168,10 @@ function ThreeQuarterDisc({
     >
       <svg className="h-full w-full overflow-visible" viewBox="0 0 200 200" aria-hidden="true">
         <path
-          d="M100 100 V2 A98 98 0 1 0 198 100 Z"
+          d="M100 88 V2 A98 98 0 1 0 198 100 H112 Q100 100 100 88 Z"
           fill="var(--secondary)"
           stroke={selected ? 'var(--ring)' : 'var(--border)'}
-          strokeWidth={selected ? 3 : 1.5}
+          strokeWidth={selected ? 2 : 1}
           vectorEffect="non-scaling-stroke"
           strokeLinejoin="round"
         />

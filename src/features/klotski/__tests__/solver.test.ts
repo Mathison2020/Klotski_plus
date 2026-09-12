@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { HENG_DAO_LI_MA, LAYOUTS } from '../layouts';
+import { HENG_DAO_LI_MA, LAYOUTS, THREE_QUARTER_SANDBOX } from '../layouts';
 import { solveKlotski, type SolverAction } from '../solver';
 import {
   getHandsetOrientation,
+  getOccupiedArea,
   getOrientation,
   getSize,
   getThreeQuarterOrientation,
@@ -124,6 +125,24 @@ describe('solveKlotski', () => {
 });
 
 describe('预设关卡', () => {
+  test('缺月重围只留两格空位且需要旋转3/4圆才能以最短路径通关', () => {
+    const occupiedArea = THREE_QUARTER_SANDBOX.pieces.reduce(
+      (area, piece) => area + getOccupiedArea(piece),
+      0,
+    );
+    const moves = solveKlotski(THREE_QUARTER_SANDBOX.pieces);
+
+    expect(occupiedArea).toBe(BOARD_COLS * BOARD_ROWS - 2);
+    expect(moves).not.toBeNull();
+    expect(moves).toHaveLength(12);
+    expect(
+      moves!.some(
+        (move) => move.kind === 'rotate' && move.pieceType === PieceType.THREE_QUARTER_DISC,
+      ),
+    ).toBe(true);
+    expect(isWin(applyMoves(THREE_QUARTER_SANDBOX.pieces, moves!))).toBe(true);
+  });
+
   test('所有预设关卡都只留下两格自由空间', () => {
     for (const layout of LAYOUTS) {
       const occupiedArea = layout.pieces.reduce((area, piece) => {
@@ -136,7 +155,7 @@ describe('预设关卡', () => {
         expect(piece.y + size.h, `关卡「${layout.name}」棋块不得越过下边界`).toBeLessThanOrEqual(
           BOARD_ROWS,
         );
-        return area + size.w * size.h;
+        return area + getOccupiedArea(piece);
       }, 0);
       expect(occupiedArea, `关卡「${layout.name}」应占用 18 格`).toBe(BOARD_COLS * BOARD_ROWS - 2);
       for (let index = 0; index < layout.pieces.length; index++) {
@@ -171,6 +190,14 @@ describe('预设关卡', () => {
         expect(
           moves!.some((move) => move.kind === 'rotate'),
           `关卡「${layout.name}」应使用半圆旋转动作`,
+        ).toBe(true);
+      }
+      if (layout.pieces.some((piece) => piece.type === PieceType.THREE_QUARTER_DISC)) {
+        expect(
+          moves!.some(
+            (move) => move.kind === 'rotate' && move.pieceType === PieceType.THREE_QUARTER_DISC,
+          ),
+          `关卡「${layout.name}」应使用3/4圆旋转动作`,
         ).toBe(true);
       }
       if (layout.pieces.some((piece) => piece.type === PieceType.HANDSET)) {

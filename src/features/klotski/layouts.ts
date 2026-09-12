@@ -1,6 +1,13 @@
-import { HandsetOrientation, Orientation, PieceType, type Layout, type Piece } from './types';
+import {
+  HandsetOrientation,
+  Orientation,
+  PieceType,
+  ThreeQuarterOrientation,
+  type Layout,
+  type Piece,
+} from './types';
 
-const { CAOCAO, GENERAL_H, GENERAL_V, SOLDIER, HALF_DISC, HANDSET } = PieceType;
+const { CAOCAO, GENERAL_H, GENERAL_V, SOLDIER, HALF_DISC, THREE_QUARTER_DISC, HANDSET } = PieceType;
 
 /** 四个竖将（1×2）在两列的固定位置 —— 与经典布局一致。 */
 const VERTICALS = [
@@ -111,6 +118,30 @@ export const HALF_DISC_SANDBOX: Layout = {
 };
 
 /**
+ * 缺月重围 —— 仅留下两格自由空间；最短解 12 步，必须旋转 3/4 圆一次。
+ */
+export const THREE_QUARTER_SANDBOX: Layout = {
+  name: '缺月重围',
+  pieces: [
+    { id: 'caocao', type: CAOCAO, x: 2, y: 2 },
+    {
+      id: 'three-quarter',
+      type: THREE_QUARTER_DISC,
+      x: 0,
+      y: 1,
+      threeQuarterOrientation: ThreeQuarterOrientation.BOTTOM_RIGHT,
+    },
+    { id: 'zhaoyun', type: GENERAL_V, x: 2, y: 0 },
+    { id: 'machao', type: GENERAL_V, x: 3, y: 0 },
+    { id: 'guanyu', type: GENERAL_H, x: 0, y: 4 },
+    { id: 'huangxu', type: GENERAL_H, x: 0, y: 3 },
+    { id: 'zu1', type: SOLDIER, x: 1, y: 0 },
+    { id: 'zu2', type: SOLDIER, x: 3, y: 4 },
+    { id: 'zu3', type: SOLDIER, x: 2, y: 4 },
+  ],
+};
+
+/**
  * 辗转腾挪 —— 由“横刀立马”把左下竖将和其下方小卒合并为三格听筒。
  * 仅留下两格自由空间；最短解 81 步，其中必须完成 6 次转角动作。
  */
@@ -144,5 +175,6 @@ export const LAYOUTS: Layout[] = [
   JIANG_SHOU_JIAO_LOU,
   CENG_CENG_SHE_FANG,
   HALF_DISC_SANDBOX,
+  THREE_QUARTER_SANDBOX,
   HANDSET_SANDBOX,
 ];
