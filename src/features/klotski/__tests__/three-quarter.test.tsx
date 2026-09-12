@@ -86,8 +86,10 @@ describe('3/4圆块渲染', () => {
     expect(element.style.left).toBe('25%');
     expect(element.style.top).toBe('40%');
     expect(element.style.transform).toBe('rotate(120deg)');
-    expect(element.style.clipPath).toContain('50% 50%');
+    expect(element.style.clipPath).toBe('');
+    expect(element.className).toContain('pointer-events-none');
     const path = element.querySelector('path')!;
+    expect(path.classList.contains('pointer-events-auto')).toBe(true);
     expect(path.getAttribute('d')).toContain('Q100 100 100 88');
     expect(path.getAttribute('stroke')).toBe('var(--ring)');
     expect(path.getAttribute('stroke-width')).toBe('2');

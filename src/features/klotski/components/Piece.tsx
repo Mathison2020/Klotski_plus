@@ -153,14 +153,13 @@ function ThreeQuarterDisc({
     height: `${(2 / BOARD_ROWS) * 100}%`,
     transformOrigin: '50% 50%',
     transform: `rotate(${angle}deg)`,
-    clipPath: 'polygon(0 0, 50% 0, 50% 50%, 100% 50%, 100% 100%, 0 100%)',
   };
 
   return (
     <div
       data-testid={`piece-${piece.id}`}
       aria-label="3/4圆块"
-      className={`absolute touch-none select-none ${
+      className={`pointer-events-none absolute touch-none select-none ${
         dragging ? '' : 'transition-[left,top] duration-150 ease-out'
       }`}
       style={style}
@@ -168,6 +167,7 @@ function ThreeQuarterDisc({
     >
       <svg className="h-full w-full overflow-visible" viewBox="0 0 200 200" aria-hidden="true">
         <path
+          className="pointer-events-auto"
           d="M100 88 V2 A98 98 0 1 0 198 100 H112 Q100 100 100 88 Z"
           fill="var(--secondary)"
           stroke={selected ? 'var(--ring)' : 'var(--border)'}

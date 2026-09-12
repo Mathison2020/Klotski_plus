@@ -134,7 +134,7 @@ describe('预设关卡', () => {
 
     expect(occupiedArea).toBe(BOARD_COLS * BOARD_ROWS - 2);
     expect(moves).not.toBeNull();
-    expect(moves).toHaveLength(12);
+    expect(moves).toHaveLength(59);
     expect(
       moves!.some(
         (move) => move.kind === 'rotate' && move.pieceType === PieceType.THREE_QUARTER_DISC,
@@ -176,7 +176,10 @@ describe('预设关卡', () => {
       expect(moves!.length, `关卡「${layout.name}」步数应大于 0`).toBeGreaterThan(0);
       if (
         layout.pieces.some(
-          (piece) => piece.type === PieceType.HALF_DISC || piece.type === PieceType.HANDSET,
+          (piece) =>
+            piece.type === PieceType.HALF_DISC ||
+            piece.type === PieceType.THREE_QUARTER_DISC ||
+            piece.type === PieceType.HANDSET,
         )
       ) {
         expect(moves!.length, `关卡「${layout.name}」应具有足够的解题深度`).toBeGreaterThanOrEqual(

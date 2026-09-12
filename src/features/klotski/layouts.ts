@@ -92,10 +92,7 @@ export const QI_TOU_BING_JIN = decodeClassicLayout('齐头并进', '351311112222
 export const BING_FEN_SAN_LU = decodeClassicLayout('兵分三路', '25123113122134131001');
 export const YI_LU_SHUN_FENG = decodeClassicLayout('一路顺风', '35121112341312310210');
 export const JIANG_SHOU_JIAO_LOU = decodeClassicLayout('将守角楼', '35131111241232231001');
-export const CENG_CENG_SHE_FANG = decodeClassicLayout(
-  '层层设防',
-  '35131111241224120410',
-);
+export const CENG_CENG_SHE_FANG = decodeClassicLayout('层层设防', '35131111241224120410');
 
 /**
  * 峰回路转 —— 由“横刀立马”把左上竖将替换为半圆。
@@ -118,26 +115,26 @@ export const HALF_DISC_SANDBOX: Layout = {
 };
 
 /**
- * 缺月重围 —— 仅留下两格自由空间；最短解 12 步，必须旋转 3/4 圆一次。
+ * 缺月重围 —— 仅留下两格自由空间；最短解 59 步，且必须旋转 3/4 圆。
  */
 export const THREE_QUARTER_SANDBOX: Layout = {
   name: '缺月重围',
   pieces: [
-    { id: 'caocao', type: CAOCAO, x: 2, y: 2 },
+    { id: 'caocao', type: CAOCAO, x: 2, y: 1 },
     {
       id: 'three-quarter',
       type: THREE_QUARTER_DISC,
       x: 0,
-      y: 1,
-      threeQuarterOrientation: ThreeQuarterOrientation.BOTTOM_RIGHT,
+      y: 3,
+      threeQuarterOrientation: ThreeQuarterOrientation.TOP_LEFT,
     },
-    { id: 'zhaoyun', type: GENERAL_V, x: 2, y: 0 },
-    { id: 'machao', type: GENERAL_V, x: 3, y: 0 },
-    { id: 'guanyu', type: GENERAL_H, x: 0, y: 4 },
-    { id: 'huangxu', type: GENERAL_H, x: 0, y: 3 },
-    { id: 'zu1', type: SOLDIER, x: 1, y: 0 },
-    { id: 'zu2', type: SOLDIER, x: 3, y: 4 },
-    { id: 'zu3', type: SOLDIER, x: 2, y: 4 },
+    { id: 'guanyu', type: GENERAL_H, x: 2, y: 0 },
+    { id: 'zhaoyun', type: GENERAL_V, x: 3, y: 3 },
+    { id: 'machao', type: GENERAL_V, x: 1, y: 0 },
+    { id: 'huangzhong', type: GENERAL_V, x: 2, y: 3 },
+    { id: 'zu1', type: SOLDIER, x: 1, y: 2 },
+    { id: 'zu2', type: SOLDIER, x: 0, y: 3 },
+    { id: 'zu3', type: SOLDIER, x: 0, y: 1 },
   ],
 };
 
