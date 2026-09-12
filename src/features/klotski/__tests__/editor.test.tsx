@@ -59,10 +59,17 @@ describe('关卡编辑器', () => {
     expect(screen.getByRole('option', { name: '自定义 · 本地测试' })).toBeTruthy();
   });
 
-  test('当前预设可导出为编码，编码可导入为持久化的自定义关卡', () => {
+  test('游玩界面不显示编码功能，编辑器可导出当前草稿并解析编码', () => {
     render(<KlotskiPage />);
+    expect(screen.queryByRole('button', { name: /导入编码/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /导出当前局面/ })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /导出当前关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
+    fireEvent.change(screen.getByLabelText('关卡名称'), { target: { value: '待导出草稿' } });
+    fireEvent.click(screen.getByRole('button', { name: '曹操 2×2' }));
+    fireEvent.click(screen.getByRole('button', { name: '在第 1 行第 2 列放置棋块' }));
+
+    fireEvent.click(screen.getByRole('button', { name: /导出当前局面/ }));
     expect((screen.getByLabelText('局面编码') as HTMLTextAreaElement).value).toMatch(/^KLP1\./u);
     fireEvent.click(screen.getByRole('button', { name: '关闭' }));
 
@@ -72,17 +79,23 @@ describe('关卡编辑器', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /导入编码/ }));
     fireEvent.change(screen.getByLabelText('局面编码'), { target: { value: code } });
-    fireEvent.click(screen.getByRole('button', { name: /导入为自定义关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: /解析并载入/ }));
 
+    expect((screen.getByLabelText('关卡名称') as HTMLInputElement).value).toBe('编码导入测试');
+    expect(screen.getByTestId('piece-cao')).toBeTruthy();
+    expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: /保存关卡/ }));
     expect(screen.getByRole('option', { name: '自定义 · 编码导入测试' })).toBeTruthy();
     expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toContain('编码导入测试');
   });
 
   test('导入非法编码时显示错误且不保存', () => {
     render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
     fireEvent.click(screen.getByRole('button', { name: /导入编码/ }));
     fireEvent.change(screen.getByLabelText('局面编码'), { target: { value: 'bad-code' } });
-    fireEvent.click(screen.getByRole('button', { name: /导入为自定义关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: /解析并载入/ }));
 
     expect(screen.getByRole('status').textContent).toContain('KLP1');
     expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toBeNull();

@@ -5,14 +5,18 @@ import {
   ArrowRightIcon,
   ArrowUpIcon,
   ArrowsClockwiseIcon,
+  CopyIcon,
+  DownloadSimpleIcon,
   FloppyDiskIcon,
   TrashIcon,
+  UploadSimpleIcon,
   XIcon,
 } from '@phosphor-icons/react';
 import { Button } from '@/components/ui';
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { BOARD_COLS, BOARD_ROWS } from '../constants';
 import { validateCustomLayout } from '../custom-layouts';
+import { decodeLayout, encodeLayout, LayoutCodeError } from '../layout-codec';
 import {
   computeRange,
   discCenter,
@@ -194,6 +198,9 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   } | null>(null);
   const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [codeMode, setCodeMode] = useState<'import' | 'export' | null>(null);
+  const [layoutCode, setLayoutCode] = useState('');
+  const [codeMessage, setCodeMessage] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<EditorDrag | null>(null);
 
@@ -320,6 +327,48 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       return;
     }
     onSave({ id: initial.id, name: name.trim(), pieces: pieces.map((piece) => ({ ...piece })) });
+  };
+
+  const openExport = () => {
+    try {
+      setLayoutCode(encodeLayout({ name, pieces }));
+      setCodeMode('export');
+      setCodeMessage(null);
+      setMessage(null);
+    } catch (error) {
+      setMessage(error instanceof LayoutCodeError ? error.message : '导出局面失败');
+    }
+  };
+
+  const openImport = () => {
+    setLayoutCode('');
+    setCodeMode('import');
+    setCodeMessage(null);
+    setMessage(null);
+  };
+
+  const importLayout = () => {
+    try {
+      const imported = decodeLayout(layoutCode);
+      setName(imported.name);
+      setPieces(imported.pieces);
+      setRender(toRenderPos(imported.pieces));
+      setSelectedId(null);
+      setHoverCell(null);
+      setMessage(null);
+      setCodeMessage(`已载入“${imported.name}”，点击“保存关卡”后才会保存。`);
+    } catch (error) {
+      setCodeMessage(error instanceof LayoutCodeError ? error.message : '导入局面失败');
+    }
+  };
+
+  const copyLayoutCode = async () => {
+    try {
+      await navigator.clipboard.writeText(layoutCode);
+      setCodeMessage('编码已复制');
+    } catch {
+      setCodeMessage('无法自动复制，请手动选择编码');
+    }
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
@@ -638,6 +687,65 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
             className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
+
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={openImport}>
+            <DownloadSimpleIcon size={16} /> 导入编码
+          </Button>
+          <Button variant="outline" size="sm" onClick={openExport}>
+            <UploadSimpleIcon size={16} /> 导出当前局面
+          </Button>
+        </div>
+
+        {codeMode && (
+          <section
+            role="dialog"
+            aria-label={codeMode === 'import' ? '导入局面编码' : '导出局面编码'}
+            className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3"
+          >
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {codeMode === 'import' ? '导入到编辑器' : '导出编辑器当前局面'}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                KLP1 编码包含名称、棋块类型、坐标与朝向。
+              </p>
+            </div>
+            <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+              局面编码
+              <textarea
+                aria-label="局面编码"
+                className="min-h-24 resize-y rounded-lg border border-input bg-background p-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+                value={layoutCode}
+                readOnly={codeMode === 'export'}
+                placeholder="粘贴以 KLP1. 开头的编码"
+                onChange={(event) => {
+                  setLayoutCode(event.currentTarget.value);
+                  setCodeMessage(null);
+                }}
+              />
+            </label>
+            {codeMessage && (
+              <p role="status" className="text-xs text-muted-foreground">
+                {codeMessage}
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setCodeMode(null)}>
+                关闭
+              </Button>
+              {codeMode === 'export' ? (
+                <Button size="sm" onClick={copyLayoutCode}>
+                  <CopyIcon size={16} /> 复制编码
+                </Button>
+              ) : (
+                <Button size="sm" onClick={importLayout} disabled={!layoutCode.trim()}>
+                  <DownloadSimpleIcon size={16} /> 解析并载入
+                </Button>
+              )}
+            </div>
+          </section>
+        )}
 
         <div>
           <p className="mb-2 text-sm font-medium text-foreground">1. 选择棋块</p>

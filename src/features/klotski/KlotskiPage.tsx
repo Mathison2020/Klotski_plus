@@ -10,14 +10,11 @@ import {
   ArrowsClockwiseIcon,
   CaretLeftIcon,
   CaretRightIcon,
-  CopyIcon,
-  DownloadSimpleIcon,
   PencilSimpleIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
   TrashIcon,
-  UploadSimpleIcon,
 } from '@phosphor-icons/react';
 import { Button, NativeSelect, NativeSelectOption, Slider } from '@/components/ui';
 import { Board, LayoutEditor, Piece as PieceView, type LayoutDraft } from './components';
@@ -38,7 +35,6 @@ import {
   turnHandset,
 } from './engine';
 import { LAYOUTS } from './layouts';
-import { decodeLayout, encodeLayout, LayoutCodeError } from './layout-codec';
 import { solveKlotski, type SolverAction } from './solver';
 import { PieceType, type HandsetPivot, type Piece, type RotationDirection } from './types';
 
@@ -192,9 +188,6 @@ export function KlotskiPage() {
   const [speedMs, setSpeedMs] = useState(SPEEDS[1].ms);
   const [editor, setEditor] = useState<LayoutDraft | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
-  const [codeMode, setCodeMode] = useState<'import' | 'export' | null>(null);
-  const [layoutCode, setLayoutCode] = useState('');
-  const [codeMessage, setCodeMessage] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
 
@@ -608,38 +601,6 @@ export function KlotskiPage() {
     dragRef.current = null;
   };
 
-  const openExport = () => {
-    setLayoutCode(encodeLayout(layouts[layoutIdx]));
-    setCodeMode('export');
-    setCodeMessage(null);
-  };
-
-  const openImport = () => {
-    setLayoutCode('');
-    setCodeMode('import');
-    setCodeMessage(null);
-  };
-
-  const importLayout = () => {
-    try {
-      const imported = decodeLayout(layoutCode);
-      saveCustomLayout(imported);
-      setCodeMode(null);
-      setCodeMessage(null);
-    } catch (error) {
-      setCodeMessage(error instanceof LayoutCodeError ? error.message : '导入局面失败');
-    }
-  };
-
-  const copyLayoutCode = async () => {
-    try {
-      await navigator.clipboard.writeText(layoutCode);
-      setCodeMessage('编码已复制');
-    } catch {
-      setCodeMessage('无法自动复制，请手动选择编码');
-    }
-  };
-
   const currentCustom =
     layoutIdx >= LAYOUTS.length ? customLayouts[layoutIdx - LAYOUTS.length] : undefined;
 
@@ -709,12 +670,6 @@ export function KlotskiPage() {
         >
           <PlusIcon size={16} /> 新建关卡
         </Button>
-        <Button variant="outline" size="sm" onClick={openImport}>
-          <DownloadSimpleIcon size={16} /> 导入编码
-        </Button>
-        <Button variant="outline" size="sm" onClick={openExport}>
-          <UploadSimpleIcon size={16} /> 导出当前关卡
-        </Button>
         {currentCustom && (
           <>
             <Button
@@ -736,56 +691,6 @@ export function KlotskiPage() {
           </>
         )}
       </div>
-
-      {codeMode && (
-        <section
-          role="dialog"
-          aria-label={codeMode === 'import' ? '导入局面编码' : '导出局面编码'}
-          className="flex w-full max-w-[420px] flex-col gap-3 rounded-xl border border-border bg-background p-4 shadow-sm"
-        >
-          <div>
-            <h2 className="text-sm font-semibold text-foreground">
-              {codeMode === 'import' ? '导入局面编码' : '导出当前关卡'}
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              KLP1 编码包含关卡名称、棋块类型、坐标与朝向。
-            </p>
-          </div>
-          <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-            局面编码
-            <textarea
-              aria-label="局面编码"
-              className="min-h-24 resize-y rounded-lg border border-input bg-transparent p-2 font-mono text-xs text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              value={layoutCode}
-              readOnly={codeMode === 'export'}
-              placeholder="粘贴以 KLP1. 开头的编码"
-              onChange={(event) => {
-                setLayoutCode(event.currentTarget.value);
-                setCodeMessage(null);
-              }}
-            />
-          </label>
-          {codeMessage && (
-            <p role="status" className="text-xs text-muted-foreground">
-              {codeMessage}
-            </p>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => setCodeMode(null)}>
-              关闭
-            </Button>
-            {codeMode === 'export' ? (
-              <Button size="sm" onClick={copyLayoutCode}>
-                <CopyIcon size={16} /> 复制编码
-              </Button>
-            ) : (
-              <Button size="sm" onClick={importLayout} disabled={!layoutCode.trim()}>
-                <DownloadSimpleIcon size={16} /> 导入为自定义关卡
-              </Button>
-            )}
-          </div>
-        </section>
-      )}
 
       <div ref={boardRef} className="relative aspect-[4/5] w-full max-w-[340px]">
         <Board />
