@@ -25,7 +25,7 @@
 - [layout-codec.ts](layout-codec.ts) — 可扩展的 KLP1 局面编码与解码
 - [constants.ts](constants.ts) — 棋盘尺寸、出口位置、各棋块尺寸
 - [engine.ts](engine.ts) — 纯逻辑：碰撞、可移动范围、吸附移动、胜利判定
-- [solver.ts](solver.ts) — 最短步求解器（经典关卡使用 BigInt BFS，异形关卡使用含旋转动作的通用 BFS）
+- [solver.ts](solver.ts) — 最短步求解器（经典关卡使用 BigInt BFS；异形关卡使用紧凑状态、位图碰撞、旋转扫掠缓存与 A\*）
 - [layouts.ts](layouts.ts) — 内置经典与异形关卡
 - [custom-layouts.ts](custom-layouts.ts) — 自定义关卡校验与本地持久化
 - [KlotskiPage.tsx](KlotskiPage.tsx) — 页面编排：状态 + 指针事件

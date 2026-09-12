@@ -13,7 +13,13 @@ import {
   turnHandset,
 } from '../engine';
 import { BOARD_COLS, BOARD_ROWS } from '../constants';
-import { PieceType, ThreeQuarterOrientation, type Piece } from '../types';
+import {
+  HandsetOrientation,
+  Orientation,
+  PieceType,
+  ThreeQuarterOrientation,
+  type Piece,
+} from '../types';
 
 /** 回放求解动作，并逐步校验平移路径和旋转是否合法。 */
 function applyMoves(pieces: Piece[], moves: SolverAction[]): Piece[] {
@@ -121,6 +127,37 @@ describe('solveKlotski', () => {
     const moves = solveKlotski(pieces);
     expect(moves).not.toBeNull();
     expect(isWin(applyMoves(pieces, moves!))).toBe(true);
+  });
+
+  test('多异形块且有五个空位的局面可以快速求出最短解', () => {
+    const pieces: Piece[] = [
+      { id: 'cao', type: PieceType.CAOCAO, x: 0, y: 0 },
+      {
+        id: 'quarter',
+        type: PieceType.THREE_QUARTER_DISC,
+        x: 2,
+        y: 0,
+        threeQuarterOrientation: ThreeQuarterOrientation.TOP_LEFT,
+      },
+      { id: 'half-a', type: PieceType.HALF_DISC, x: 0, y: 2, orientation: Orientation.DOWN },
+      { id: 'half-b', type: PieceType.HALF_DISC, x: 2, y: 2, orientation: Orientation.DOWN },
+      {
+        id: 'handset',
+        type: PieceType.HANDSET,
+        x: 0,
+        y: 3,
+        handsetOrientation: HandsetOrientation.UP,
+      },
+      { id: 'soldier', type: PieceType.SOLDIER, x: 3, y: 3 },
+    ];
+
+    const started = performance.now();
+    const moves = solveKlotski(pieces);
+    const elapsed = performance.now() - started;
+
+    expect(moves).toHaveLength(11);
+    expect(isWin(applyMoves(pieces, moves!))).toBe(true);
+    expect(elapsed).toBeLessThan(1_000);
   });
 });
 

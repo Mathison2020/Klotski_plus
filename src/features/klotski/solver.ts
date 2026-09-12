@@ -3,8 +3,8 @@
  *
  * 核心思路：
  * - 经典关卡保留紧凑的 BigInt 状态编码和同形规范化，避免影响已确认的 90 步结果与性能。
- * - 含异形块的关卡使用通用状态编码，把半圆、3/4 圆和听筒朝向纳入状态，并复用引擎判定。
- * - 搜索：BFS。一次单轴滑动任意距离或一次 90° 旋转都计为一步，每个合法落点均生成后继。
+ * - 含异形块的关卡使用紧凑 BigInt 状态编码，把半圆、3/4 圆和听筒朝向纳入状态。
+ * - 搜索：经典布局使用 BFS；通用布局使用保持最短解的 A*，优先探索更接近出口的状态。
  * - 回溯：parent 链 + 逐步 move 记录，反向拼出解序列。
  *
  * 计数口径说明：华容道不同资料对「步」定义不一（移动一格 / 滑动任意距离 / 滑到底）。
@@ -12,13 +12,13 @@
  */
 
 import {
-  computeRange,
   getHandsetOrientation,
+  getOccupiedCells,
   getOrientation,
   getSize,
   getThreeQuarterOrientation,
+  handsetTurnDirection,
   isWin,
-  movePiece,
   rotatePiece,
   turnHandset,
 } from './engine';
@@ -201,42 +201,138 @@ function expand(state: bigint): { next: bigint; move: SolverMove }[] {
   return out;
 }
 
-/** 含可旋转棋块的状态键；同类型、同朝向棋块交换位置视为同一局面。 */
-function genericStateKey(pieces: Piece[]): string {
-  const groups = new Map<string, number[]>();
+const GENERIC_TOKEN_BITS = 10n;
+const PIECE_TYPE_INDEX = new Map(
+  Object.values(PieceType).map((pieceType, index) => [pieceType, index] as const),
+);
+const HALF_ORIENTATIONS = ['right', 'down', 'left', 'up'] as const;
+const THREE_QUARTER_ORIENTATIONS = [
+  'top-right',
+  'bottom-right',
+  'bottom-left',
+  'top-left',
+] as const;
+const HANDSET_ORIENTATIONS = ['up', 'right', 'down', 'left'] as const;
+
+/** 含可旋转棋块的紧凑状态键；同类型、同朝向棋块交换位置视为同一局面。 */
+function genericStateKey(pieces: Piece[]): bigint {
+  const tokens: number[] = [];
   for (const piece of pieces) {
-    const orientation =
+    const orientationIndex =
       piece.type === PieceType.HALF_DISC
-        ? `:${getOrientation(piece)}`
+        ? HALF_ORIENTATIONS.indexOf(getOrientation(piece))
         : piece.type === PieceType.THREE_QUARTER_DISC
-          ? `:${getThreeQuarterOrientation(piece)}`
+          ? THREE_QUARTER_ORIENTATIONS.indexOf(getThreeQuarterOrientation(piece))
           : piece.type === PieceType.HANDSET
-            ? `:${getHandsetOrientation(piece)}`
-            : '';
-    const group = `${piece.type}${orientation}`;
-    const positions = groups.get(group) ?? [];
-    positions.push(posValue(piece.x, piece.y));
-    groups.set(group, positions);
+            ? HANDSET_ORIENTATIONS.indexOf(getHandsetOrientation(piece))
+            : 0;
+    const typeIndex = PIECE_TYPE_INDEX.get(piece.type)!;
+    const group = typeIndex * 4 + orientationIndex;
+    tokens.push(group * (COLS * ROWS) + posValue(piece.x, piece.y));
   }
 
-  return [...groups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([group, positions]) => `${group}=${positions.sort((a, b) => a - b).join(',')}`)
-    .join('|');
+  tokens.sort((a, b) => a - b);
+  let key = 0n;
+  for (const token of tokens) key = (key << GENERIC_TOKEN_BITS) | BigInt(token + 1);
+  return key;
+}
+
+function occupiedMask(piece: Piece): number {
+  let mask = 0;
+  for (const cell of getOccupiedCells(piece)) mask |= 1 << posValue(cell.x, cell.y);
+  return mask;
+}
+
+interface CachedShapeTransition {
+  target: Piece;
+  blockingMask: number;
+}
+
+const halfRotationCache = new Map<string, CachedShapeTransition | null>();
+const handsetTurnCache = new Map<string, CachedShapeTransition | null>();
+
+/**
+ * 旋转扫掠与其它棋块的具体 id 无关，只取决于被占用的单位格。
+ * 棋盘仅 20 格，因此首次遇到一种姿态时用单格阻挡物求出扫掠遮罩，后续 O(1) 判定。
+ */
+function cachedHalfRotation(
+  piece: Piece,
+  direction: RotationDirection,
+): CachedShapeTransition | null {
+  const key = `${piece.x},${piece.y},${getOrientation(piece)},${direction}`;
+  const cached = halfRotationCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const source: Piece = { ...piece, id: '__solver-moving-half' };
+  const alone = rotatePiece([source], source.id, direction);
+  const target = alone?.[0];
+  if (!target) {
+    halfRotationCache.set(key, null);
+    return null;
+  }
+
+  let blockingMask = 0;
+  for (let position = 0; position < COLS * ROWS; position++) {
+    const blocker: Piece = {
+      id: '__solver-blocker',
+      type: PieceType.SOLDIER,
+      x: position % COLS,
+      y: Math.floor(position / COLS),
+    };
+    if (!rotatePiece([source, blocker], source.id, direction)) blockingMask |= 1 << position;
+  }
+  const transition = { target, blockingMask };
+  halfRotationCache.set(key, transition);
+  return transition;
+}
+
+function cachedHandsetTurn(piece: Piece, pivot: HandsetPivot): CachedShapeTransition | null {
+  const direction = handsetTurnDirection(piece, pivot);
+  const key = `${piece.x},${piece.y},${getHandsetOrientation(piece)},${pivot}`;
+  const cached = handsetTurnCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const source: Piece = { ...piece, id: '__solver-moving-handset' };
+  const alone = turnHandset([source], source.id, pivot, direction);
+  const target = alone?.[0];
+  if (!target) {
+    handsetTurnCache.set(key, null);
+    return null;
+  }
+
+  let blockingMask = 0;
+  for (let position = 0; position < COLS * ROWS; position++) {
+    const blocker: Piece = {
+      id: '__solver-blocker',
+      type: PieceType.SOLDIER,
+      x: position % COLS,
+      y: Math.floor(position / COLS),
+    };
+    if (!turnHandset([source, blocker], source.id, pivot, direction)) blockingMask |= 1 << position;
+  }
+  const transition = { target, blockingMask };
+  handsetTurnCache.set(key, transition);
+  return transition;
 }
 
 function expandGeneric(pieces: Piece[]): { next: Piece[]; action: SolverAction }[] {
   const out: { next: Piece[]; action: SolverAction }[] = [];
+  const masks = pieces.map(occupiedMask);
+  const allOccupied = masks.reduce((mask, pieceMask) => mask | pieceMask, 0);
 
-  for (const piece of pieces) {
+  for (let index = 0; index < pieces.length; index++) {
+    const piece = pieces[index];
     const size = getSize(piece);
-    for (const axis of ['x', 'y'] as const) {
-      const range = computeRange(pieces, piece, axis);
-      const start = axis === 'x' ? piece.x : piece.y;
-      for (let target = range.min; target <= range.max; target++) {
-        if (target === start) continue;
-        const next = movePiece(pieces, piece.id, axis, target);
-        const moved = next.find((candidate) => candidate.id === piece.id)!;
+    const otherOccupied = allOccupied ^ masks[index];
+    for (const [dx, dy] of DIRS) {
+      for (let distance = 1; ; distance++) {
+        const x = piece.x + dx * distance;
+        const y = piece.y + dy * distance;
+        if (x < 0 || y < 0 || x + size.w > COLS || y + size.h > ROWS) break;
+        const moved = { ...piece, x, y };
+        if ((occupiedMask(moved) & otherOccupied) !== 0) break;
+        const next = [...pieces];
+        next[index] = moved;
         out.push({
           next,
           action: {
@@ -244,7 +340,7 @@ function expandGeneric(pieces: Piece[]): { next: Piece[]; action: SolverAction }
             w: size.w,
             h: size.h,
             from: { x: piece.x, y: piece.y },
-            to: { x: moved.x, y: moved.y },
+            to: { x, y },
           },
         });
       }
@@ -254,8 +350,16 @@ function expandGeneric(pieces: Piece[]): { next: Piece[]; action: SolverAction }
       continue;
     }
     for (const direction of ['clockwise', 'counterclockwise'] as const) {
-      const next = rotatePiece(pieces, piece.id, direction);
-      if (!next) continue;
+      let next: Piece[] | null;
+      if (piece.type === PieceType.HALF_DISC) {
+        const transition = cachedHalfRotation(piece, direction);
+        if (!transition || (transition.blockingMask & otherOccupied) !== 0) continue;
+        next = [...pieces];
+        next[index] = { ...piece, ...transition.target, id: piece.id };
+      } else {
+        next = rotatePiece(pieces, piece.id, direction);
+        if (!next) continue;
+      }
       out.push({
         next,
         action: {
@@ -272,57 +376,138 @@ function expandGeneric(pieces: Piece[]): { next: Piece[]; action: SolverAction }
     }
   }
 
-  for (const piece of pieces) {
+  for (let index = 0; index < pieces.length; index++) {
+    const piece = pieces[index];
     if (piece.type !== PieceType.HANDSET) continue;
+    const otherOccupied = allOccupied ^ masks[index];
     for (const pivot of ['start', 'end'] as const) {
-      for (const direction of ['clockwise', 'counterclockwise'] as const) {
-        const next = turnHandset(pieces, piece.id, pivot, direction);
-        if (!next) continue;
-        out.push({
-          next,
-          action: {
-            kind: 'corner-turn',
-            from: { x: piece.x, y: piece.y },
-            orientation: getHandsetOrientation(piece),
-            pivot,
-            direction,
-          },
-        });
-      }
+      const direction = handsetTurnDirection(piece, pivot);
+      const transition = cachedHandsetTurn(piece, pivot);
+      if (!transition || (transition.blockingMask & otherOccupied) !== 0) continue;
+      const next = [...pieces];
+      next[index] = { ...piece, ...transition.target, id: piece.id };
+      out.push({
+        next,
+        action: {
+          kind: 'corner-turn',
+          from: { x: piece.x, y: piece.y },
+          orientation: getHandsetOrientation(piece),
+          pivot,
+          direction,
+        },
+      });
     }
   }
 
   return out;
 }
 
+interface GenericSearchNode {
+  key: bigint;
+  pieces: Piece[];
+  distance: number;
+  estimate: number;
+  order: number;
+}
+
+/** 二叉最小堆；同一估值下优先更深的节点，尽早在当前最优层内找到出口。 */
+class GenericMinHeap {
+  private readonly values: GenericSearchNode[] = [];
+
+  get size(): number {
+    return this.values.length;
+  }
+
+  private before(a: GenericSearchNode, b: GenericSearchNode): boolean {
+    if (a.estimate !== b.estimate) return a.estimate < b.estimate;
+    if (a.distance !== b.distance) return a.distance > b.distance;
+    return a.order < b.order;
+  }
+
+  push(node: GenericSearchNode): void {
+    const values = this.values;
+    values.push(node);
+    let index = values.length - 1;
+    while (index > 0) {
+      const parent = Math.floor((index - 1) / 2);
+      if (this.before(values[parent], node)) break;
+      values[index] = values[parent];
+      index = parent;
+    }
+    values[index] = node;
+  }
+
+  pop(): GenericSearchNode {
+    const values = this.values;
+    const root = values[0];
+    const tail = values.pop()!;
+    if (values.length === 0) return root;
+
+    let index = 0;
+    while (true) {
+      const left = index * 2 + 1;
+      if (left >= values.length) break;
+      const right = left + 1;
+      const child =
+        right < values.length && this.before(values[right], values[left]) ? right : left;
+      if (this.before(tail, values[child])) break;
+      values[index] = values[child];
+      index = child;
+    }
+    values[index] = tail;
+    return root;
+  }
+}
+
+/** 忽略碰撞后，曹操抵达出口至少需要分别修正横、纵坐标；该启发值可采纳且一致。 */
+function genericHeuristic(pieces: Piece[]): number {
+  const caocao = pieces.find((piece) => piece.type === PieceType.CAOCAO);
+  if (!caocao) return 0;
+  return Number(caocao.x !== 1) + Number(caocao.y !== 3);
+}
+
 function solveGeneric(input: Piece[]): SolverAction[] | null {
   const startPieces = input.map((piece) => ({ ...piece }));
   const startKey = genericStateKey(startPieces);
-  const queue: { key: string; pieces: Piece[] }[] = [{ key: startKey, pieces: startPieces }];
-  const visited = new Set<string>([startKey]);
-  const parent = new Map<string, { previous: string; action: SolverAction }>();
-  let head = 0;
+  const queue = new GenericMinHeap();
+  queue.push({
+    key: startKey,
+    pieces: startPieces,
+    distance: 0,
+    estimate: genericHeuristic(startPieces),
+    order: 0,
+  });
+  const bestDistance = new Map<bigint, number>([[startKey, 0]]);
+  const parent = new Map<bigint, { previous: bigint; action: SolverAction }>();
+  let order = 1;
 
-  while (head < queue.length) {
-    const current = queue[head++];
+  while (queue.size > 0) {
+    const current = queue.pop();
+    if (bestDistance.get(current.key) !== current.distance) continue;
+    if (isWin(current.pieces)) {
+      const actions: SolverAction[] = [];
+      let node = current.key;
+      while (node !== startKey) {
+        const entry = parent.get(node)!;
+        actions.push(entry.action);
+        node = entry.previous;
+      }
+      return actions.reverse();
+    }
+
     for (const { next, action } of expandGeneric(current.pieces)) {
       const key = genericStateKey(next);
-      if (visited.has(key)) continue;
-      visited.add(key);
+      const distance = current.distance + 1;
+      if ((bestDistance.get(key) ?? Number.POSITIVE_INFINITY) <= distance) continue;
+      bestDistance.set(key, distance);
       parent.set(key, { previous: current.key, action });
-
-      if (isWin(next)) {
-        const actions: SolverAction[] = [];
-        let node = key;
-        while (node !== startKey) {
-          const entry = parent.get(node)!;
-          actions.push(entry.action);
-          node = entry.previous;
-        }
-        return actions.reverse();
-      }
-
-      queue.push({ key, pieces: next });
+      queue.push({
+        key,
+        pieces: next,
+        distance,
+        estimate: distance + genericHeuristic(next),
+        order: order++,
+      });
     }
   }
 
