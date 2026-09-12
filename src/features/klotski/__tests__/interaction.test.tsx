@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { ButtonHTMLAttributes, OptionHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { KlotskiPage } from '../KlotskiPage';
@@ -83,6 +83,7 @@ describe('半圆块交互', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -112,7 +113,7 @@ describe('半圆块交互', () => {
     expect(fireEvent.contextMenu(screen.getByRole('heading', { name: '华容道' }))).toBe(false);
   });
 
-  test('演示后切回手动模式保留累计步数，仅重新开始时清零', () => {
+  test('演示步数计入累计值，切回手动模式后保留，仅重新开始时清零', () => {
     render(<KlotskiPage />);
     selectLayout('峰回路转');
 
@@ -122,8 +123,12 @@ describe('半圆块交互', () => {
     fireEvent.pointerUp(soldier, { button: 0, clientX: 350, clientY: 350, pointerId: 8 });
     expect(screen.getByText(/步数 1/)).toBeTruthy();
 
+    vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: '开始演示' }));
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.getByText(/演示模式 · 步数 2/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '暂停演示' }));
+    vi.useRealTimers();
 
     const demoSoldier = screen.getByTestId('piece-zu1');
     fireEvent.pointerDown(demoSoldier, {
@@ -138,7 +143,7 @@ describe('半圆块交互', () => {
       clientY: 350,
       pointerId: 9,
     });
-    expect(screen.getByText(/步数 1/)).toBeTruthy();
+    expect(screen.getByText(/步数 2/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '重新开始' }));
     expect(screen.getByText(/步数 0/)).toBeTruthy();

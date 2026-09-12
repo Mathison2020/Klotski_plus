@@ -233,6 +233,7 @@ export function KlotskiPage() {
             frame = requestAnimationFrame(animate);
           } else {
             setRotationPreview(null);
+            setSteps((count) => count + 1);
             setPlayIndex((index) => index + 1);
           }
         };
@@ -241,7 +242,10 @@ export function KlotskiPage() {
       }
     }
 
-    const timer = setTimeout(() => setPlayIndex((i) => i + 1), speedMs);
+    const timer = setTimeout(() => {
+      setSteps((count) => count + 1);
+      setPlayIndex((index) => index + 1);
+    }, speedMs);
     return () => clearTimeout(timer);
   }, [demoStart, playing, solution, playIndex, speedMs]);
 
@@ -271,7 +275,9 @@ export function KlotskiPage() {
     if (solution === null) return;
     setPlaying(false);
     setRotationPreview(null);
-    setPlayIndex((i) => clamp(i + delta, 0, total));
+    const next = clamp(playIndex + delta, 0, total);
+    if (next > playIndex) setSteps((count) => count + next - playIndex);
+    setPlayIndex(next);
   };
 
   const handleSliderChange = (value: number | readonly number[]) => {
@@ -279,7 +285,9 @@ export function KlotskiPage() {
     const next = Array.isArray(value) ? Number(value[0]) : Number(value);
     setPlaying(false);
     setRotationPreview(null);
-    setPlayIndex(clamp(next, 0, total));
+    const nextIndex = clamp(next, 0, total);
+    if (nextIndex > playIndex) setSteps((count) => count + nextIndex - playIndex);
+    setPlayIndex(nextIndex);
   };
 
   const rotateSelected = (direction: RotationDirection = 'clockwise') => {
@@ -739,6 +747,7 @@ export function KlotskiPage() {
               size="icon-sm"
               onClick={() => stepBy(-1)}
               disabled={solution === null || playIndex <= 0}
+              aria-label="上一步"
             >
               <CaretLeftIcon size={16} />
             </Button>
@@ -755,6 +764,7 @@ export function KlotskiPage() {
               size="icon-sm"
               onClick={() => stepBy(1)}
               disabled={solution === null || playIndex >= total}
+              aria-label="下一步"
             >
               <CaretRightIcon size={16} />
             </Button>
@@ -803,7 +813,7 @@ export function KlotskiPage() {
           {solution === null ? (
             <span>手动模式 · 左键平移 · 右键拖动旋转/转角 · 步数 {steps}</span>
           ) : (
-            <span>演示模式</span>
+            <span>演示模式 · 步数 {steps}</span>
           )}
         </div>
       </div>
