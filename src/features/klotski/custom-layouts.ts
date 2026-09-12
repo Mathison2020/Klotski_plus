@@ -90,7 +90,7 @@ export function validateCustomLayout(name: string, pieces: Piece[]): string | nu
   return null;
 }
 
-function parseCustomLayout(value: unknown): CustomLayout | null {
+export function parseCustomLayout(value: unknown): CustomLayout | null {
   if (!value || typeof value !== 'object') return null;
   const layout = value as Partial<CustomLayout>;
   if (

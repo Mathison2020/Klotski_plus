@@ -3,6 +3,8 @@ import type { ButtonHTMLAttributes, OptionHTMLAttributes, SelectHTMLAttributes }
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CUSTOM_LAYOUTS_STORAGE_KEY } from '../custom-layouts';
 import { KlotskiPage } from '../KlotskiPage';
+import { encodeLayout } from '../layout-codec';
+import { PieceType } from '../types';
 
 vi.mock('@/components/ui', () => ({
   Button: ({
@@ -55,6 +57,35 @@ describe('关卡编辑器', () => {
     first.unmount();
     render(<KlotskiPage />);
     expect(screen.getByRole('option', { name: '自定义 · 本地测试' })).toBeTruthy();
+  });
+
+  test('当前预设可导出为编码，编码可导入为持久化的自定义关卡', () => {
+    render(<KlotskiPage />);
+
+    fireEvent.click(screen.getByRole('button', { name: /导出当前关卡/ }));
+    expect((screen.getByLabelText('局面编码') as HTMLTextAreaElement).value).toMatch(/^KLP1\./u);
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+
+    const code = encodeLayout({
+      name: '编码导入测试',
+      pieces: [{ id: 'cao', type: PieceType.CAOCAO, x: 1, y: 0 }],
+    });
+    fireEvent.click(screen.getByRole('button', { name: /导入编码/ }));
+    fireEvent.change(screen.getByLabelText('局面编码'), { target: { value: code } });
+    fireEvent.click(screen.getByRole('button', { name: /导入为自定义关卡/ }));
+
+    expect(screen.getByRole('option', { name: '自定义 · 编码导入测试' })).toBeTruthy();
+    expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toContain('编码导入测试');
+  });
+
+  test('导入非法编码时显示错误且不保存', () => {
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /导入编码/ }));
+    fireEvent.change(screen.getByLabelText('局面编码'), { target: { value: 'bad-code' } });
+    fireEvent.click(screen.getByRole('button', { name: /导入为自定义关卡/ }));
+
+    expect(screen.getByRole('status').textContent).toContain('KLP1');
+    expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toBeNull();
   });
 
   test('非法布局不会保存，并显示明确原因', () => {
