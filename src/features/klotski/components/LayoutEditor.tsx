@@ -192,6 +192,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
     degrees: number;
     target?: Piece;
   } | null>(null);
+  const [hoverCell, setHoverCell] = useState<{ x: number; y: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<EditorDrag | null>(null);
@@ -211,6 +212,30 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       : tool === PieceType.THREE_QUARTER_DISC
         ? THREE_QUARTER_LABELS[placementOrientation]
         : HANDSET_LABELS[placementOrientation];
+  const toolLabel = TOOLS.find((item) => item.type === tool)?.label ?? tool;
+  const toolPreview = useMemo(
+    () => ({ ...createPiece(tool, 0, 0, [], placementOrientation), id: 'tool-preview' }),
+    [tool, placementOrientation],
+  );
+  const toolPreviewSize = getSize(toolPreview);
+  const toolPreviewPosition = {
+    x: (BOARD_COLS - toolPreviewSize.w) / 2,
+    y: (BOARD_ROWS - toolPreviewSize.h) / 2,
+  };
+  const hoverPreview = useMemo(
+    () =>
+      hoverCell
+        ? {
+            ...createPiece(tool, hoverCell.x, hoverCell.y, [], placementOrientation),
+            id: 'hover-preview',
+          }
+        : null,
+    [hoverCell, tool, placementOrientation],
+  );
+  const hoverPreviewValid =
+    hoverPreview !== null &&
+    !(tool === PieceType.CAOCAO && pieces.some((piece) => piece.type === PieceType.CAOCAO)) &&
+    canPlace(hoverPreview, pieces);
 
   const chooseTool = (type: Piece['type']) => {
     setTool(type);
@@ -240,6 +265,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
     setPieces(next);
     setRender(toRenderPos(next));
     setSelectedId(candidate.id);
+    setHoverCell(null);
     setMessage(null);
   };
 
@@ -305,6 +331,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
 
     event.preventDefault();
     event.stopPropagation();
+    setHoverCell(null);
     event.currentTarget.setPointerCapture(event.pointerId);
     setSelectedId(piece.id);
     setDraggingId(piece.id);
@@ -503,10 +530,32 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
     dragRef.current = null;
   };
 
+  const handleBoardPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragRef.current) {
+      if (hoverCell) setHoverCell(null);
+      return;
+    }
+    const rect = boardRef.current?.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
+    const x = Math.floor(((event.clientX - rect.left) / rect.width) * BOARD_COLS);
+    const y = Math.floor(((event.clientY - rect.top) / rect.height) * BOARD_ROWS);
+    if (x < 0 || x >= BOARD_COLS || y < 0 || y >= BOARD_ROWS) {
+      setHoverCell(null);
+      return;
+    }
+    if (hoverCell?.x !== x || hoverCell.y !== y) setHoverCell({ x, y });
+  };
+
   return (
     <div className="editor-panel flex w-full max-w-[780px] flex-col gap-5 rounded-xl border border-border bg-card p-5 shadow-sm md:flex-row">
       <div className="w-full shrink-0 md:w-[340px]">
-        <div ref={boardRef} className="relative aspect-[4/5] w-full overflow-visible">
+        <div
+          ref={boardRef}
+          data-testid="layout-editor-board"
+          className="relative aspect-[4/5] w-full overflow-visible"
+          onPointerMove={handleBoardPointerMove}
+          onPointerLeave={() => setHoverCell(null)}
+        >
           <Board />
           <div className="absolute inset-0 z-10 grid grid-cols-4 grid-rows-5">
             {Array.from({ length: BOARD_COLS * BOARD_ROWS }, (_, index) => {
@@ -547,6 +596,28 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
               );
             })}
           </div>
+          {hoverPreview && (
+            <div
+              data-testid="placement-hover-preview"
+              data-valid={hoverPreviewValid}
+              aria-hidden="true"
+              className={`pointer-events-none absolute inset-0 z-30 transition-opacity ${
+                hoverPreviewValid ? 'opacity-50' : 'opacity-25 grayscale'
+              }`}
+            >
+              <PieceView
+                piece={hoverPreview}
+                renderX={hoverPreview.x}
+                renderY={hoverPreview.y}
+                selected={false}
+                dragging
+                onPointerDown={() => {}}
+                onPointerMove={() => {}}
+                onPointerUp={() => {}}
+                onPointerCancel={() => {}}
+              />
+            </div>
+          )}
         </div>
         <p className="mt-3 text-center text-xs text-muted-foreground">
           左键拖动平移 · 异形块按住右键拖动旋转
@@ -583,6 +654,34 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
                 {item.label}
               </Button>
             ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-muted/40 px-3 py-2">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-foreground">当前放置预览</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {toolLabel}
+              {hasPlacementOrientation ? ` · ${placementLabel}` : ''}
+            </p>
+          </div>
+          <div
+            aria-label="当前棋块预览"
+            className="relative aspect-[4/5] w-20 shrink-0 overflow-hidden rounded-md border border-border/70 bg-background/80"
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+              <PieceView
+                piece={toolPreview}
+                renderX={toolPreviewPosition.x}
+                renderY={toolPreviewPosition.y}
+                selected={false}
+                dragging
+                onPointerDown={() => {}}
+                onPointerMove={() => {}}
+                onPointerUp={() => {}}
+                onPointerCancel={() => {}}
+              />
+            </div>
           </div>
         </div>
 
