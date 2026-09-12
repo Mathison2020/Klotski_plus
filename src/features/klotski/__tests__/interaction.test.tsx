@@ -112,6 +112,38 @@ describe('半圆块交互', () => {
     expect(fireEvent.contextMenu(screen.getByRole('heading', { name: '华容道' }))).toBe(false);
   });
 
+  test('演示后切回手动模式保留累计步数，仅重新开始时清零', () => {
+    render(<KlotskiPage />);
+    selectLayout('峰回路转');
+
+    const soldier = screen.getByTestId('piece-zu1');
+    fireEvent.pointerDown(soldier, { button: 0, clientX: 250, clientY: 350, pointerId: 8 });
+    fireEvent.pointerMove(soldier, { button: 0, clientX: 350, clientY: 350, pointerId: 8 });
+    fireEvent.pointerUp(soldier, { button: 0, clientX: 350, clientY: 350, pointerId: 8 });
+    expect(screen.getByText(/步数 1/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '开始演示' }));
+    fireEvent.click(screen.getByRole('button', { name: '暂停演示' }));
+
+    const demoSoldier = screen.getByTestId('piece-zu1');
+    fireEvent.pointerDown(demoSoldier, {
+      button: 0,
+      clientX: 350,
+      clientY: 350,
+      pointerId: 9,
+    });
+    fireEvent.pointerUp(demoSoldier, {
+      button: 0,
+      clientX: 350,
+      clientY: 350,
+      pointerId: 9,
+    });
+    expect(screen.getByText(/步数 1/)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: '重新开始' }));
+    expect(screen.getByText(/步数 0/)).toBeTruthy();
+  });
+
   test.each([125, 250, 375])('听筒任意横向位置（x=%i）都可开始右键转角', (pointerX) => {
     render(<KlotskiPage />);
     selectLayout('辗转腾挪');

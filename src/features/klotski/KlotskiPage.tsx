@@ -253,7 +253,6 @@ export function KlotskiPage() {
     setSolution(s);
     setPlayIndex(0);
     setPlaying(true);
-    setSteps(0);
   };
 
   const togglePlay = () => {
@@ -743,7 +742,12 @@ export function KlotskiPage() {
             >
               <CaretLeftIcon size={16} />
             </Button>
-            <Button variant="outline" size="icon-sm" onClick={togglePlay}>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={togglePlay}
+              aria-label={playing ? '暂停演示' : solution === null ? '开始演示' : '继续演示'}
+            >
               {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
             </Button>
             <Button
@@ -784,7 +788,13 @@ export function KlotskiPage() {
             <ArrowsClockwiseIcon size={16} />
           </Button>
 
-          <Button variant="outline" size="icon-sm" onClick={reset}>
+          <Button
+            variant="outline"
+            size="icon-sm"
+            onClick={reset}
+            aria-label="重新开始"
+            title="重新开始"
+          >
             <ArrowCounterClockwiseIcon size={16} />
           </Button>
         </div>
