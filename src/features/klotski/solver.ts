@@ -3,7 +3,7 @@
  *
  * 核心思路：
  * - 经典关卡保留紧凑的 BigInt 状态编码和同形规范化，避免影响已确认的 90 步结果与性能。
- * - 含异形块的关卡使用通用状态编码，把半圆朝向和听筒凹口朝向纳入状态，并复用引擎判定。
+ * - 含异形块的关卡使用通用状态编码，把半圆、3/4 圆和听筒朝向纳入状态，并复用引擎判定。
  * - 搜索：BFS。一次单轴滑动任意距离或一次 90° 旋转都计为一步，每个合法落点均生成后继。
  * - 回溯：parent 链 + 逐步 move 记录，反向拼出解序列。
  *
@@ -16,6 +16,7 @@ import {
   getHandsetOrientation,
   getOrientation,
   getSize,
+  getThreeQuarterOrientation,
   isWin,
   movePiece,
   rotatePiece,
@@ -28,6 +29,7 @@ import {
   type Orientation,
   type Piece,
   type RotationDirection,
+  type ThreeQuarterOrientation,
 } from './types';
 
 /** 单步移动记录，用于回溯回放。 */
@@ -41,8 +43,9 @@ export interface SolverMove {
 
 export interface SolverRotation {
   kind: 'rotate';
+  pieceType: typeof PieceType.HALF_DISC | typeof PieceType.THREE_QUARTER_DISC;
   from: { x: number; y: number };
-  orientation: Orientation;
+  orientation: Orientation | ThreeQuarterOrientation;
   direction: RotationDirection;
 }
 
@@ -81,7 +84,14 @@ const GROUPS = [
 
 /** 紧凑编码只适用于一横将、四竖将、四卒的传统棋子组合。 */
 function supportsCompactEncoding(pieces: Piece[]): boolean {
-  if (pieces.some((piece) => piece.type === PieceType.HALF_DISC || piece.type === PieceType.HANDSET)) {
+  if (
+    pieces.some(
+      (piece) =>
+        piece.type === PieceType.HALF_DISC ||
+        piece.type === PieceType.THREE_QUARTER_DISC ||
+        piece.type === PieceType.HANDSET,
+    )
+  ) {
     return false;
   }
   if (pieces.length !== GROUPS.reduce((total, group) => total + group.count, 0)) return false;
@@ -198,9 +208,11 @@ function genericStateKey(pieces: Piece[]): string {
     const orientation =
       piece.type === PieceType.HALF_DISC
         ? `:${getOrientation(piece)}`
-        : piece.type === PieceType.HANDSET
-          ? `:${getHandsetOrientation(piece)}`
-          : '';
+        : piece.type === PieceType.THREE_QUARTER_DISC
+          ? `:${getThreeQuarterOrientation(piece)}`
+          : piece.type === PieceType.HANDSET
+            ? `:${getHandsetOrientation(piece)}`
+            : '';
     const group = `${piece.type}${orientation}`;
     const positions = groups.get(group) ?? [];
     positions.push(posValue(piece.x, piece.y));
@@ -238,7 +250,9 @@ function expandGeneric(pieces: Piece[]): { next: Piece[]; action: SolverAction }
       }
     }
 
-    if (piece.type !== PieceType.HALF_DISC) continue;
+    if (piece.type !== PieceType.HALF_DISC && piece.type !== PieceType.THREE_QUARTER_DISC) {
+      continue;
+    }
     for (const direction of ['clockwise', 'counterclockwise'] as const) {
       const next = rotatePiece(pieces, piece.id, direction);
       if (!next) continue;
@@ -246,8 +260,12 @@ function expandGeneric(pieces: Piece[]): { next: Piece[]; action: SolverAction }
         next,
         action: {
           kind: 'rotate',
+          pieceType: piece.type,
           from: { x: piece.x, y: piece.y },
-          orientation: getOrientation(piece),
+          orientation:
+            piece.type === PieceType.HALF_DISC
+              ? getOrientation(piece)
+              : getThreeQuarterOrientation(piece),
           direction,
         },
       });

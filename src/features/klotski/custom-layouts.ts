@@ -1,6 +1,13 @@
 import { BOARD_COLS, BOARD_ROWS } from './constants';
-import { getSize, overlaps } from './engine';
-import { HandsetOrientation, Orientation, PieceType, type Layout, type Piece } from './types';
+import { getOccupiedArea, getSize, overlaps } from './engine';
+import {
+  HandsetOrientation,
+  Orientation,
+  PieceType,
+  ThreeQuarterOrientation,
+  type Layout,
+  type Piece,
+} from './types';
 
 export const CUSTOM_LAYOUTS_STORAGE_KEY = 'klotski.custom-layouts.v1';
 
@@ -10,6 +17,7 @@ export interface CustomLayout extends Layout {
 
 const PIECE_TYPES = new Set<string>(Object.values(PieceType));
 const ORIENTATIONS = new Set<string>(Object.values(Orientation));
+const THREE_QUARTER_ORIENTATIONS = new Set<string>(Object.values(ThreeQuarterOrientation));
 const HANDSET_ORIENTATIONS = new Set<string>(Object.values(HandsetOrientation));
 
 function isPiece(value: unknown): value is Piece {
@@ -29,6 +37,13 @@ function isPiece(value: unknown): value is Piece {
     piece.type === PieceType.HALF_DISC &&
     piece.orientation !== undefined &&
     !ORIENTATIONS.has(piece.orientation)
+  ) {
+    return false;
+  }
+  if (
+    piece.type === PieceType.THREE_QUARTER_DISC &&
+    piece.threeQuarterOrientation !== undefined &&
+    !THREE_QUARTER_ORIENTATIONS.has(piece.threeQuarterOrientation)
   ) {
     return false;
   }
@@ -55,7 +70,7 @@ export function validateCustomLayout(name: string, pieces: Piece[]): string | nu
   let occupiedArea = 0;
   for (const piece of pieces) {
     const size = getSize(piece);
-    occupiedArea += size.w * size.h;
+    occupiedArea += getOccupiedArea(piece);
     if (
       piece.x < 0 ||
       piece.y < 0 ||

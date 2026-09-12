@@ -16,6 +16,7 @@ import { validateCustomLayout } from '../custom-layouts';
 import {
   computeRange,
   discCenter,
+  getOccupiedArea,
   getSize,
   handsetCenter,
   handsetTurnDirection,
@@ -28,6 +29,7 @@ import {
   HandsetOrientation,
   Orientation,
   PieceType,
+  ThreeQuarterOrientation,
   type HandsetPivot,
   type Layout,
   type Piece,
@@ -42,6 +44,7 @@ const TOOLS = [
   { type: PieceType.GENERAL_V, label: '竖将 1×2' },
   { type: PieceType.SOLDIER, label: '卒 1×1' },
   { type: PieceType.HALF_DISC, label: '半圆 1×2' },
+  { type: PieceType.THREE_QUARTER_DISC, label: '3/4圆 3格' },
   { type: PieceType.HANDSET, label: '听筒 1×3' },
 ] as const;
 
@@ -57,7 +60,14 @@ const HANDSET_ORIENTATION_ORDER = [
   HandsetOrientation.DOWN,
   HandsetOrientation.LEFT,
 ] as const;
+const THREE_QUARTER_ORIENTATION_ORDER = [
+  ThreeQuarterOrientation.TOP_RIGHT,
+  ThreeQuarterOrientation.BOTTOM_RIGHT,
+  ThreeQuarterOrientation.BOTTOM_LEFT,
+  ThreeQuarterOrientation.TOP_LEFT,
+] as const;
 const HALF_LABELS = ['弧面向右', '弧面向下', '弧面向左', '弧面向上'] as const;
+const THREE_QUARTER_LABELS = ['缺口右上', '缺口右下', '缺口左下', '缺口左上'] as const;
 const HANDSET_LABELS = ['凹口向上', '凹口向右', '凹口向下', '凹口向左'] as const;
 
 type RenderPos = Record<string, { x: number; y: number }>;
@@ -144,6 +154,12 @@ function createPiece(
   if (type === PieceType.HALF_DISC) {
     return { ...base, orientation: ORIENTATION_ORDER[orientationIndex] };
   }
+  if (type === PieceType.THREE_QUARTER_DISC) {
+    return {
+      ...base,
+      threeQuarterOrientation: THREE_QUARTER_ORIENTATION_ORDER[orientationIndex],
+    };
+  }
   if (type === PieceType.HANDSET) {
     return { ...base, handsetOrientation: HANDSET_ORIENTATION_ORDER[orientationIndex] };
   }
@@ -182,14 +198,19 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
 
   const selected = pieces.find((piece) => piece.id === selectedId) ?? null;
   const occupiedArea = useMemo(
-    () => pieces.reduce((area, piece) => area + getSize(piece).w * getSize(piece).h, 0),
+    () => pieces.reduce((area, piece) => area + getOccupiedArea(piece), 0),
     [pieces],
   );
-  const hasPlacementOrientation = tool === PieceType.HALF_DISC || tool === PieceType.HANDSET;
+  const hasPlacementOrientation =
+    tool === PieceType.HALF_DISC ||
+    tool === PieceType.THREE_QUARTER_DISC ||
+    tool === PieceType.HANDSET;
   const placementLabel =
     tool === PieceType.HALF_DISC
       ? HALF_LABELS[placementOrientation]
-      : HANDSET_LABELS[placementOrientation];
+      : tool === PieceType.THREE_QUARTER_DISC
+        ? THREE_QUARTER_LABELS[placementOrientation]
+        : HANDSET_LABELS[placementOrientation];
 
   const chooseTool = (type: Piece['type']) => {
     setTool(type);
@@ -239,7 +260,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   const rotateSelected = () => {
     if (!selected) return;
     let next: Piece[] | null = null;
-    if (selected.type === PieceType.HALF_DISC) {
+    if (selected.type === PieceType.HALF_DISC || selected.type === PieceType.THREE_QUARTER_DISC) {
       next = rotatePiece(pieces, selected.id, 'clockwise');
     } else if (selected.type === PieceType.HANDSET) {
       for (const pivot of ['start', 'end'] as const) {
@@ -276,9 +297,11 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
-    const wantsHalfRotation = event.button === 2 && piece.type === PieceType.HALF_DISC;
+    const wantsPieceRotation =
+      event.button === 2 &&
+      (piece.type === PieceType.HALF_DISC || piece.type === PieceType.THREE_QUARTER_DISC);
     const wantsCornerTurn = event.button === 2 && piece.type === PieceType.HANDSET;
-    if (event.button !== 0 && !wantsHalfRotation && !wantsCornerTurn) return;
+    if (event.button !== 0 && !wantsPieceRotation && !wantsCornerTurn) return;
 
     event.preventDefault();
     event.stopPropagation();
@@ -291,8 +314,9 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
     const cellW = rect ? rect.width / BOARD_COLS : 1;
     const cellH = rect ? rect.height / BOARD_ROWS : 1;
 
-    if (wantsHalfRotation) {
-      const center = discCenter(piece);
+    if (wantsPieceRotation) {
+      const center =
+        piece.type === PieceType.HALF_DISC ? discCenter(piece) : { x: piece.x + 1, y: piece.y + 1 };
       const centerX = (rect?.left ?? 0) + center.x * cellW;
       const centerY = (rect?.top ?? 0) + center.y * cellH;
       dragRef.current = {
@@ -525,7 +549,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
           </div>
         </div>
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          左键拖动平移 · 半圆/听筒按住右键拖动旋转
+          左键拖动平移 · 异形块按住右键拖动旋转
         </p>
       </div>
 
@@ -636,7 +660,9 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
               size="icon-sm"
               variant="outline"
               disabled={
-                selected?.type !== PieceType.HALF_DISC && selected?.type !== PieceType.HANDSET
+                selected?.type !== PieceType.HALF_DISC &&
+                selected?.type !== PieceType.THREE_QUARTER_DISC &&
+                selected?.type !== PieceType.HANDSET
               }
               onClick={rotateSelected}
               aria-label="按游戏规则旋转棋块"

@@ -19,5 +19,6 @@ export const PIECE_SIZE: Record<PieceType, { w: number; h: number }> = {
   [PieceType.GENERAL_V]: { w: 1, h: 2 },
   [PieceType.SOLDIER]: { w: 1, h: 1 },
   [PieceType.HALF_DISC]: { w: 1, h: 2 },
+  [PieceType.THREE_QUARTER_DISC]: { w: 2, h: 2 },
   [PieceType.HANDSET]: { w: 1, h: 3 },
 } as const;

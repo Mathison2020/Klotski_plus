@@ -6,7 +6,7 @@ import {
   validateCustomLayout,
   type CustomLayout,
 } from '../custom-layouts';
-import { PieceType, type Piece } from '../types';
+import { PieceType, ThreeQuarterOrientation, type Piece } from '../types';
 
 const VALID_PIECES: Piece[] = [
   { id: 'cao', type: PieceType.CAOCAO, x: 1, y: 0 },
@@ -24,6 +24,25 @@ describe('自定义关卡持久化', () => {
     expect(loaded).toEqual(layouts);
     expect(loaded).not.toBe(layouts);
     expect(loaded[0].pieces).not.toBe(VALID_PIECES);
+  });
+
+  test('保存并恢复3/4圆块的缺口朝向', () => {
+    const pieces: Piece[] = [
+      VALID_PIECES[0],
+      {
+        id: 'three-quarter',
+        type: PieceType.THREE_QUARTER_DISC,
+        x: 0,
+        y: 2,
+        threeQuarterOrientation: ThreeQuarterOrientation.BOTTOM_LEFT,
+      },
+    ];
+    persistCustomLayouts([{ id: 'custom-three-quarter', name: '三格块', pieces }]);
+
+    expect(loadCustomLayouts()[0].pieces[1]).toMatchObject({
+      type: PieceType.THREE_QUARTER_DISC,
+      threeQuarterOrientation: ThreeQuarterOrientation.BOTTOM_LEFT,
+    });
   });
 
   test('损坏的数据和非法布局会被忽略', () => {

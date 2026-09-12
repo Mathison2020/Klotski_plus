@@ -8,6 +8,7 @@ export const PieceType = {
   GENERAL_V: 'general-v',
   SOLDIER: 'soldier',
   HALF_DISC: 'half-disc',
+  THREE_QUARTER_DISC: 'three-quarter-disc',
   HANDSET: 'handset',
 } as const;
 
@@ -22,6 +23,17 @@ export const Orientation = {
 } as const;
 
 export type Orientation = (typeof Orientation)[keyof typeof Orientation];
+
+/** 3/4 圆缺口所在的象限；棋块本体占据 2×2 外接框中的另外三格。 */
+export const ThreeQuarterOrientation = {
+  TOP_RIGHT: 'top-right',
+  BOTTOM_RIGHT: 'bottom-right',
+  BOTTOM_LEFT: 'bottom-left',
+  TOP_LEFT: 'top-left',
+} as const;
+
+export type ThreeQuarterOrientation =
+  (typeof ThreeQuarterOrientation)[keyof typeof ThreeQuarterOrientation];
 
 export type RotationDirection = 'clockwise' | 'counterclockwise';
 
@@ -46,6 +58,7 @@ export interface Piece {
   x: number;
   y: number;
   orientation?: Orientation;
+  threeQuarterOrientation?: ThreeQuarterOrientation;
   handsetOrientation?: HandsetOrientation;
 }
 

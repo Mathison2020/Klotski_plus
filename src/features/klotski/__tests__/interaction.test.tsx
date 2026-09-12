@@ -28,6 +28,19 @@ vi.mock('../layouts', () => ({
         { id: 'zu1', type: 'soldier', x: 2, y: 3 },
       ],
     },
+    {
+      name: '三分归圆',
+      pieces: [
+        { id: 'caocao', type: 'caocao', x: 0, y: 3 },
+        {
+          id: 'three-quarter',
+          type: 'three-quarter-disc',
+          x: 1,
+          y: 0,
+          threeQuarterOrientation: 'top-right',
+        },
+      ],
+    },
   ],
 }));
 
@@ -142,6 +155,24 @@ describe('半圆块交互', () => {
     fireEvent.pointerMove(handset, { button: 0, clientX: 350, clientY: 250, pointerId: 4 });
     fireEvent.pointerUp(handset, { button: 0, clientX: 350, clientY: 250, pointerId: 4 });
     expect(screen.getByLabelText('电话听筒块').style.top).toBe('40%');
+    expect(screen.getByText(/步数 2/)).toBeTruthy();
+  });
+
+  test('3/4圆块支持原地旋转和普通平移', () => {
+    render(<KlotskiPage />);
+    selectLayout('三分归圆');
+
+    let piece = screen.getByLabelText('3/4圆块');
+    fireEvent.pointerDown(piece, { button: 2, clientX: 250, clientY: 100, pointerId: 6 });
+    fireEvent.pointerMove(piece, { button: 2, clientX: 200, clientY: 150, pointerId: 6 });
+    fireEvent.pointerUp(piece, { button: 2, clientX: 200, clientY: 150, pointerId: 6 });
+    expect(screen.getByLabelText('3/4圆块').style.transform).toBe('rotate(90deg)');
+
+    piece = screen.getByLabelText('3/4圆块');
+    fireEvent.pointerDown(piece, { button: 0, clientX: 150, clientY: 50, pointerId: 7 });
+    fireEvent.pointerMove(piece, { button: 0, clientX: 150, clientY: 150, pointerId: 7 });
+    fireEvent.pointerUp(piece, { button: 0, clientX: 150, clientY: 150, pointerId: 7 });
+    expect(screen.getByLabelText('3/4圆块').style.top).toBe('20%');
     expect(screen.getByText(/步数 2/)).toBeTruthy();
   });
 });

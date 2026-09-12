@@ -8,6 +8,7 @@ import {
   handsetOrientationDegrees,
   handsetTurnCenter,
   orientationDegrees,
+  threeQuarterOrientationDegrees,
 } from '../engine';
 import { PieceType, type Piece } from '../types';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
@@ -18,6 +19,7 @@ const LABEL: Record<Piece['type'], string> = {
   [PieceType.GENERAL_V]: '将',
   [PieceType.SOLDIER]: '卒',
   [PieceType.HALF_DISC]: '半',
+  [PieceType.THREE_QUARTER_DISC]: '¾圆',
   [PieceType.HANDSET]: '听筒',
 };
 
@@ -27,6 +29,7 @@ const VARIANT: Record<Piece['type'], string> = {
   [PieceType.GENERAL_V]: 'bg-accent text-accent-foreground',
   [PieceType.SOLDIER]: 'bg-muted text-muted-foreground',
   [PieceType.HALF_DISC]: 'bg-secondary text-secondary-foreground',
+  [PieceType.THREE_QUARTER_DISC]: 'bg-secondary text-secondary-foreground',
   [PieceType.HANDSET]: 'bg-secondary text-secondary-foreground',
 };
 
@@ -118,6 +121,73 @@ function Handset({
 
 function getSizeStyle(piece: Piece): { w: number; h: number } {
   return getSize(piece);
+}
+
+/** 2×2 外接框内缺少右上象限的 3/4 圆；其余朝向通过绕中心旋转得到。 */
+function ThreeQuarterDisc({
+  piece,
+  renderX,
+  renderY,
+  selected,
+  dragging,
+  rotationDegrees = 0,
+  ...events
+}: {
+  piece: Piece;
+  renderX: number;
+  renderY: number;
+  selected: boolean;
+  dragging: boolean;
+  rotationDegrees?: number;
+  onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerCancel: (e: ReactPointerEvent<HTMLDivElement>) => void;
+}) {
+  const angle =
+    threeQuarterOrientationDegrees(piece.threeQuarterOrientation ?? 'top-right') + rotationDegrees;
+  const style: CSSProperties = {
+    left: `${(renderX / BOARD_COLS) * 100}%`,
+    top: `${(renderY / BOARD_ROWS) * 100}%`,
+    width: `${(2 / BOARD_COLS) * 100}%`,
+    height: `${(2 / BOARD_ROWS) * 100}%`,
+    transformOrigin: '50% 50%',
+    transform: `rotate(${angle}deg)`,
+    clipPath: 'polygon(0 0, 50% 0, 50% 50%, 100% 50%, 100% 100%, 0 100%)',
+  };
+
+  return (
+    <div
+      data-testid={`piece-${piece.id}`}
+      aria-label="3/4圆块"
+      className={`absolute touch-none select-none ${
+        dragging ? '' : 'transition-[left,top] duration-150 ease-out'
+      }`}
+      style={style}
+      {...events}
+    >
+      <svg className="h-full w-full overflow-visible" viewBox="0 0 200 200" aria-hidden="true">
+        <path
+          d="M100 100 V2 A98 98 0 1 0 198 100 Z"
+          fill="var(--secondary)"
+          stroke={selected ? 'var(--ring)' : 'var(--border)'}
+          strokeWidth={selected ? 3 : 1.5}
+          vectorEffect="non-scaling-stroke"
+          strokeLinejoin="round"
+        />
+        <text
+          x="72"
+          y="126"
+          fill="var(--secondary-foreground)"
+          fontSize="18"
+          fontWeight="500"
+          textAnchor="middle"
+        >
+          将
+        </text>
+      </svg>
+    </div>
+  );
 }
 
 /**
@@ -229,6 +299,23 @@ export function Piece({
         dragging={dragging}
         rotationDegrees={rotationDegrees}
         rotationTarget={rotationTarget}
+        onPointerDown={(e) => onPointerDown(e, piece)}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerCancel}
+      />
+    );
+  }
+
+  if (piece.type === PieceType.THREE_QUARTER_DISC) {
+    return (
+      <ThreeQuarterDisc
+        piece={piece}
+        renderX={renderX}
+        renderY={renderY}
+        selected={selected}
+        dragging={dragging}
+        rotationDegrees={rotationDegrees}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

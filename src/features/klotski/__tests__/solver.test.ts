@@ -5,13 +5,14 @@ import {
   getHandsetOrientation,
   getOrientation,
   getSize,
+  getThreeQuarterOrientation,
   isWin,
   overlaps,
   rotatePiece,
   turnHandset,
 } from '../engine';
 import { BOARD_COLS, BOARD_ROWS } from '../constants';
-import { PieceType, type Piece } from '../types';
+import { PieceType, ThreeQuarterOrientation, type Piece } from '../types';
 
 /** 回放求解动作，并逐步校验平移路径和旋转是否合法。 */
 function applyMoves(pieces: Piece[], moves: SolverAction[]): Piece[] {
@@ -21,12 +22,14 @@ function applyMoves(pieces: Piece[], moves: SolverAction[]): Piece[] {
     if (m.kind === 'rotate') {
       const piece = state.find(
         (candidate) =>
-          candidate.type === PieceType.HALF_DISC &&
+          candidate.type === m.pieceType &&
           candidate.x === m.from.x &&
           candidate.y === m.from.y &&
-          getOrientation(candidate) === m.orientation,
+          (candidate.type === PieceType.HALF_DISC
+            ? getOrientation(candidate)
+            : getThreeQuarterOrientation(candidate)) === m.orientation,
       );
-      expect(piece, '旋转来源半圆块必须存在').toBeDefined();
+      expect(piece, '旋转来源棋块必须存在').toBeDefined();
       const rotated = rotatePiece(state, piece!.id, m.direction);
       expect(rotated, '旋转动作必须满足边界与碰撞约束').not.toBeNull();
       state = rotated!;
@@ -100,6 +103,23 @@ describe('solveKlotski', () => {
   test('已获胜局面返回空序列', () => {
     const wonPiece: Piece = { id: 'caocao', type: PieceType.CAOCAO, x: 1, y: 3 };
     expect(solveKlotski([wonPiece])).toEqual([]);
+  });
+
+  test('含3/4圆块的盘面使用通用求解器并可正确回放', () => {
+    const pieces: Piece[] = [
+      { id: 'caocao', type: PieceType.CAOCAO, x: 1, y: 2 },
+      {
+        id: 'three-quarter',
+        type: PieceType.THREE_QUARTER_DISC,
+        x: 0,
+        y: 0,
+        threeQuarterOrientation: ThreeQuarterOrientation.TOP_RIGHT,
+      },
+    ];
+
+    const moves = solveKlotski(pieces);
+    expect(moves).not.toBeNull();
+    expect(isWin(applyMoves(pieces, moves!))).toBe(true);
   });
 });
 

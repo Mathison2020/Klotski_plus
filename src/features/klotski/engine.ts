@@ -7,6 +7,7 @@ import {
   HandsetOrientation,
   Orientation,
   PieceType,
+  ThreeQuarterOrientation,
   type HandsetPivot,
   type Piece,
   type RotationDirection,
@@ -25,6 +26,13 @@ const HANDSET_ORIENTATION_ORDER = [
   HandsetOrientation.RIGHT,
   HandsetOrientation.DOWN,
   HandsetOrientation.LEFT,
+] as const;
+
+const THREE_QUARTER_ORIENTATION_ORDER = [
+  ThreeQuarterOrientation.TOP_RIGHT,
+  ThreeQuarterOrientation.BOTTOM_RIGHT,
+  ThreeQuarterOrientation.BOTTOM_LEFT,
+  ThreeQuarterOrientation.TOP_LEFT,
 ] as const;
 
 interface Point {
@@ -115,14 +123,16 @@ function segmentsCross(a: Point, b: Point, c: Point, d: Point): boolean {
   return abC * abD < 0 && cdA * cdB < 0;
 }
 
-function polygonIntersectsPiece(polygon: readonly Point[], piece: Piece): boolean {
-  const size = getSize(piece);
+function polygonIntersectsRect(
+  polygon: readonly Point[],
+  rect: { x: number; y: number; w: number; h: number },
+): boolean {
   // 圆弧由三次贝塞尔和离散线段近似；相切应合法，公差仅吸收近似误差。
   const inset = 0.001;
-  const left = piece.x + inset;
-  const right = piece.x + size.w - inset;
-  const top = piece.y + inset;
-  const bottom = piece.y + size.h - inset;
+  const left = rect.x + inset;
+  const right = rect.x + rect.w - inset;
+  const top = rect.y + inset;
+  const bottom = rect.y + rect.h - inset;
   const corners: Point[] = [
     { x: left, y: top },
     { x: right, y: top },
@@ -147,6 +157,15 @@ function polygonIntersectsPiece(polygon: readonly Point[], piece: Piece): boolea
   return false;
 }
 
+function polygonIntersectsPiece(polygon: readonly Point[], piece: Piece): boolean {
+  if (piece.type !== PieceType.THREE_QUARTER_DISC) {
+    return polygonIntersectsRect(polygon, { ...piece, ...getSize(piece) });
+  }
+  return getOccupiedCells(piece).some((cell) =>
+    polygonIntersectsRect(polygon, { ...cell, w: 1, h: 1 }),
+  );
+}
+
 const CENTER_OFFSET: Record<Orientation, { x: number; y: number }> = {
   [Orientation.RIGHT]: { x: 0, y: 1 },
   [Orientation.DOWN]: { x: 1, y: 0 },
@@ -169,6 +188,10 @@ export function getHandsetOrientation(piece: Piece): HandsetOrientation {
   return piece.handsetOrientation ?? HandsetOrientation.UP;
 }
 
+export function getThreeQuarterOrientation(piece: Piece): ThreeQuarterOrientation {
+  return piece.threeQuarterOrientation ?? ThreeQuarterOrientation.TOP_RIGHT;
+}
+
 export function orientationDegrees(orientation: Orientation): number {
   return ORIENTATION_ORDER.indexOf(orientation) * 90;
 }
@@ -176,6 +199,10 @@ export function orientationDegrees(orientation: Orientation): number {
 export function handsetOrientationDegrees(orientation: HandsetOrientation): number {
   if (orientation === HandsetOrientation.LEFT) return -90;
   return HANDSET_ORIENTATION_ORDER.indexOf(orientation) * 90;
+}
+
+export function threeQuarterOrientationDegrees(orientation: ThreeQuarterOrientation): number {
+  return THREE_QUARTER_ORIENTATION_ORDER.indexOf(orientation) * 90;
 }
 
 /** 返回棋块的占用尺寸（单位格）。上下朝向为 2×1，左右朝向为 1×2。 */
@@ -193,6 +220,33 @@ export function getSize(piece: Piece): { w: number; h: number } {
       : { w: 1, h: 3 };
   }
   return PIECE_SIZE[piece.type];
+}
+
+/** 棋块实际占用的绝对格坐标；3/4 圆只占 2×2 外接框中的三个格。 */
+export function getOccupiedCells(piece: Piece): { x: number; y: number }[] {
+  const size = getSize(piece);
+  const cells: { x: number; y: number }[] = [];
+  const missing =
+    piece.type === PieceType.THREE_QUARTER_DISC
+      ? {
+          [ThreeQuarterOrientation.TOP_RIGHT]: { x: 1, y: 0 },
+          [ThreeQuarterOrientation.BOTTOM_RIGHT]: { x: 1, y: 1 },
+          [ThreeQuarterOrientation.BOTTOM_LEFT]: { x: 0, y: 1 },
+          [ThreeQuarterOrientation.TOP_LEFT]: { x: 0, y: 0 },
+        }[getThreeQuarterOrientation(piece)]
+      : null;
+
+  for (let y = 0; y < size.h; y++) {
+    for (let x = 0; x < size.w; x++) {
+      if (missing?.x === x && missing.y === y) continue;
+      cells.push({ x: piece.x + x, y: piece.y + y });
+    }
+  }
+  return cells;
+}
+
+export function getOccupiedArea(piece: Piece): number {
+  return getOccupiedCells(piece).length;
 }
 
 /** 电话听筒外接矩形的中心点。 */
@@ -320,8 +374,8 @@ function positionFromCenter(
 }
 
 /**
- * 将指定半圆块绕其圆心（直径中点）旋转 90°，圆心保持不动。
- * 仅对 HALF_DISC 生效；旋转后越界或与其它块重叠则返回 null（不旋转）。
+ * 将半圆块绕直径中点旋转，或将 3/4 圆块在 2×2 外接框内原地旋转 90°。
+ * 旋转后越界或与其它块重叠则返回 null（不旋转）。
  */
 export function rotatePiece(
   pieces: Piece[],
@@ -329,7 +383,26 @@ export function rotatePiece(
   direction: RotationDirection = 'clockwise',
 ): Piece[] | null {
   const piece = pieces.find((p) => p.id === id);
-  if (!piece || piece.type !== PieceType.HALF_DISC) return null;
+  if (
+    !piece ||
+    (piece.type !== PieceType.HALF_DISC && piece.type !== PieceType.THREE_QUARTER_DISC)
+  ) {
+    return null;
+  }
+
+  if (piece.type === PieceType.THREE_QUARTER_DISC) {
+    const currentIndex = THREE_QUARTER_ORIENTATION_ORDER.indexOf(getThreeQuarterOrientation(piece));
+    const delta = direction === 'clockwise' ? 1 : -1;
+    const threeQuarterOrientation =
+      THREE_QUARTER_ORIENTATION_ORDER[
+        (currentIndex + delta + THREE_QUARTER_ORIENTATION_ORDER.length) %
+          THREE_QUARTER_ORIENTATION_ORDER.length
+      ];
+    const rotated: Piece = { ...piece, threeQuarterOrientation };
+    const others = pieces.filter((candidate) => candidate.id !== id);
+    if (others.some((other) => overlaps(rotated, other))) return null;
+    return pieces.map((candidate) => (candidate.id === id ? rotated : candidate));
+  }
 
   const center = discCenter(piece);
   const currentIndex = ORIENTATION_ORDER.indexOf(getOrientation(piece));
@@ -401,11 +474,17 @@ export function turnHandset(
   return pieces.map((candidate) => (candidate.id === id ? turned : candidate));
 }
 
-/** 两块棋子的格子矩形是否重叠。 */
+/** 两块棋子的实际占用格是否重叠。 */
 export function overlaps(a: Piece, b: Piece): boolean {
-  const sa = getSize(a);
-  const sb = getSize(b);
-  return a.x < b.x + sb.w && b.x < a.x + sa.w && a.y < b.y + sb.h && b.y < a.y + sa.h;
+  if (a.type !== PieceType.THREE_QUARTER_DISC && b.type !== PieceType.THREE_QUARTER_DISC) {
+    const sa = getSize(a);
+    const sb = getSize(b);
+    return a.x < b.x + sb.w && b.x < a.x + sa.w && a.y < b.y + sb.h && b.y < a.y + sa.h;
+  }
+
+  const aCells = getOccupiedCells(a);
+  const bCells = getOccupiedCells(b);
+  return aCells.some((aCell) => bCells.some((bCell) => aCell.x === bCell.x && aCell.y === bCell.y));
 }
 
 function isInside(x: number, y: number, w: number, h: number): boolean {

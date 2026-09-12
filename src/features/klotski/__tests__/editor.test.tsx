@@ -81,6 +81,12 @@ describe('关卡编辑器', () => {
     expect(screen.getByText('凹口向右')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '在第 1 行第 4 列放置棋块' }));
     expect(screen.getByLabelText('电话听筒块').style.transform).toBe('rotate(90deg)');
+
+    fireEvent.click(screen.getByRole('button', { name: '3/4圆 3格' }));
+    fireEvent.click(screen.getByRole('button', { name: '顺时针切换放置朝向' }));
+    expect(screen.getByText('缺口右下')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '在第 4 行第 1 列放置棋块' }));
+    expect(screen.getByLabelText('3/4圆块').style.transform).toBe('rotate(90deg)');
   });
 
   test('编辑器内支持左键拖动平移和右键拖动旋转', () => {
@@ -102,5 +108,28 @@ describe('关卡编辑器', () => {
     fireEvent.pointerMove(half, { button: 2, clientX: 100, clientY: 250, pointerId: 2 });
     fireEvent.pointerUp(half, { button: 2, clientX: 100, clientY: 250, pointerId: 2 });
     expect(screen.getByLabelText('半圆块').style.transform).toBe('rotate(90deg)');
+
+    fireEvent.click(screen.getByRole('button', { name: '3/4圆 3格' }));
+    fireEvent.click(screen.getByRole('button', { name: '在第 3 行第 3 列放置棋块' }));
+    const threeQuarter = screen.getByLabelText('3/4圆块');
+    fireEvent.pointerDown(threeQuarter, {
+      button: 2,
+      clientX: 350,
+      clientY: 300,
+      pointerId: 3,
+    });
+    fireEvent.pointerMove(threeQuarter, {
+      button: 2,
+      clientX: 300,
+      clientY: 350,
+      pointerId: 3,
+    });
+    fireEvent.pointerUp(threeQuarter, {
+      button: 2,
+      clientX: 300,
+      clientY: 350,
+      pointerId: 3,
+    });
+    expect(screen.getByLabelText('3/4圆块').style.transform).toBe('rotate(90deg)');
   });
 });

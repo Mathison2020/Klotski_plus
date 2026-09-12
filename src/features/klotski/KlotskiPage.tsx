@@ -26,6 +26,7 @@ import {
   getHandsetOrientation,
   getOrientation,
   getSize,
+  getThreeQuarterOrientation,
   handsetCenter,
   handsetTurnDirection,
   isWin,
@@ -114,10 +115,12 @@ function applySolverMove(
   if (action.kind === 'rotate') {
     const piece = pieces.find(
       (candidate) =>
-        candidate.type === PieceType.HALF_DISC &&
+        candidate.type === action.pieceType &&
         candidate.x === action.from.x &&
         candidate.y === action.from.y &&
-        getOrientation(candidate) === action.orientation,
+        (candidate.type === PieceType.HALF_DISC
+          ? getOrientation(candidate)
+          : getThreeQuarterOrientation(candidate)) === action.orientation,
     );
     if (!piece) return null;
     const next = rotatePiece(pieces, piece.id, action.direction);
@@ -291,10 +294,12 @@ export function KlotskiPage() {
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
     if (playing) return;
-    const wantsHalfRotation = e.button === 2 && piece.type === PieceType.HALF_DISC;
+    const wantsPieceRotation =
+      e.button === 2 &&
+      (piece.type === PieceType.HALF_DISC || piece.type === PieceType.THREE_QUARTER_DISC);
     const wantsCornerTurn = e.button === 2 && piece.type === PieceType.HANDSET;
-    if (e.button !== 0 && !wantsHalfRotation && !wantsCornerTurn) return;
-    if (wantsHalfRotation || wantsCornerTurn) e.preventDefault();
+    if (e.button !== 0 && !wantsPieceRotation && !wantsCornerTurn) return;
+    if (wantsPieceRotation || wantsCornerTurn) e.preventDefault();
 
     // 演示模式下用户手动拖动：把当前演示盘面固化为手动状态，退出演示。
     if (solution !== null) {
@@ -314,8 +319,9 @@ export function KlotskiPage() {
     const cellW = rect ? rect.width / BOARD_COLS : 1;
     const cellH = rect ? rect.height / BOARD_ROWS : 1;
 
-    if (wantsHalfRotation) {
-      const center = discCenter(piece);
+    if (wantsPieceRotation) {
+      const center =
+        piece.type === PieceType.HALF_DISC ? discCenter(piece) : { x: piece.x + 1, y: piece.y + 1 };
       const centerX = (rect?.left ?? 0) + center.x * cellW;
       const centerY = (rect?.top ?? 0) + center.y * cellH;
       dragRef.current = {
@@ -767,9 +773,13 @@ export function KlotskiPage() {
             variant="outline"
             size="icon-sm"
             onClick={() => rotateSelected('clockwise')}
-            disabled={selectedPiece?.type !== PieceType.HALF_DISC || playing}
-            aria-label="顺时针旋转半圆"
-            title="顺时针旋转半圆（也可按住右键环绕拖动）"
+            disabled={
+              (selectedPiece?.type !== PieceType.HALF_DISC &&
+                selectedPiece?.type !== PieceType.THREE_QUARTER_DISC) ||
+              playing
+            }
+            aria-label="顺时针旋转棋块"
+            title="顺时针旋转选中的半圆或3/4圆（也可按住右键环绕拖动）"
           >
             <ArrowsClockwiseIcon size={16} />
           </Button>
