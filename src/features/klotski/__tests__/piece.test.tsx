@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import { Piece } from '../components/Piece';
-import { Orientation, PieceType } from '../types';
+import { HandsetOrientation, Orientation, PieceType } from '../types';
 
 const handlers = {
   onPointerDown: vi.fn(),
@@ -136,4 +136,56 @@ describe('棋块高亮', () => {
     expect(shape.className).toContain('ring-2');
     expect(shape.className).toContain('ring-ring');
   });
+});
+
+describe('听筒块渲染', () => {
+  test.each([
+    [HandsetOrientation.LEFT, -90, '-180deg', HandsetOrientation.DOWN, '180deg'],
+    [HandsetOrientation.DOWN, 90, '270deg', HandsetOrientation.LEFT, '-90deg'],
+  ] as const)(
+    '左向与下向双向切换时不对等价的 360° 角度差执行过渡',
+    (sourceOrientation, rotationDegrees, previewAngle, targetOrientation, targetAngle) => {
+      const view = render(
+        <Piece
+          piece={{
+            id: 'handset',
+            type: PieceType.HANDSET,
+            x: 0,
+            y: 0,
+            handsetOrientation: sourceOrientation,
+          }}
+          renderX={0}
+          renderY={0}
+          selected={false}
+          dragging
+          rotationDegrees={rotationDegrees}
+          {...handlers}
+        />,
+      );
+
+      const element = view.container.querySelector<HTMLElement>('[data-testid="piece-handset"]')!;
+      expect(element.style.transform).toBe(`rotate(${previewAngle})`);
+
+      view.rerender(
+        <Piece
+          piece={{
+            id: 'handset',
+            type: PieceType.HANDSET,
+            x: 0,
+            y: 0,
+            handsetOrientation: targetOrientation,
+          }}
+          renderX={0}
+          renderY={0}
+          selected={false}
+          dragging={false}
+          {...handlers}
+        />,
+      );
+
+      expect(element.style.transform).toBe(`rotate(${targetAngle})`);
+      expect(element.className).toContain('transition-[left,top]');
+      expect(element.className).not.toContain('transition-[left,top,transform]');
+    },
+  );
 });

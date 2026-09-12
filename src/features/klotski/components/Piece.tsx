@@ -90,7 +90,10 @@ function Handset({
       data-testid={`piece-${piece.id}`}
       aria-label="电话听筒块"
       className={`absolute touch-none select-none ${
-        dragging ? '' : 'transition-[left,top,transform] duration-150 ease-out'
+        // 转角预览的末帧可能与目标朝向相差整整 360°（例如 LEFT -> DOWN：
+        // -180° 与 180°）。transform 若参与 CSS 过渡，浏览器会在提交状态时
+        // 额外旋转一整圈；位置仍保留吸附动画，角度则直接切到等价姿态。
+        dragging ? '' : 'transition-[left,top] duration-150 ease-out'
       }`}
       style={style}
       {...events}
