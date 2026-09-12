@@ -8,12 +8,21 @@ import {
   CopyIcon,
   DownloadSimpleIcon,
   FloppyDiskIcon,
+  LockKeyIcon,
+  SparkleIcon,
+  StopIcon,
   TrashIcon,
   UploadSimpleIcon,
   XIcon,
 } from '@phosphor-icons/react';
 import { Button } from '@/components/ui';
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { BOARD_COLS, BOARD_ROWS } from '../constants';
 import { validateCustomLayout } from '../custom-layouts';
 import { decodeLayout, encodeLayout, LayoutCodeError } from '../layout-codec';
@@ -76,6 +85,20 @@ const HANDSET_LABELS = ['凹口向上', '凹口向右', '凹口向下', '凹口�
 
 type RenderPos = Record<string, { x: number; y: number }>;
 
+type SolveState =
+  | { status: 'idle' }
+  | { status: 'solving' }
+  | { status: 'solved'; steps: number; elapsedMs: number }
+  | { status: 'unsolvable'; elapsedMs: number }
+  | { status: 'error'; message: string };
+
+interface SolverWorkerResponse {
+  requestId: number;
+  steps: number | null;
+  elapsedMs: number;
+  error?: string;
+}
+
 interface MoveDrag {
   kind: 'move';
   id: string;
@@ -135,6 +158,10 @@ interface LayoutEditorProps {
 
 function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
+}
+
+function formatDuration(elapsedMs: number): string {
+  return elapsedMs < 1000 ? `${elapsedMs} 毫秒` : `${(elapsedMs / 1000).toFixed(1)} 秒`;
 }
 
 function toRenderPos(pieces: Piece[]): RenderPos {
@@ -201,8 +228,37 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   const [codeMode, setCodeMode] = useState<'import' | 'export' | null>(null);
   const [layoutCode, setLayoutCode] = useState('');
   const [codeMessage, setCodeMessage] = useState<string | null>(null);
+  const [lockedPieces, setLockedPieces] = useState<Piece[]>(() =>
+    initial.pieces.map((piece) => ({ ...piece })),
+  );
+  const [workspaceMessage, setWorkspaceMessage] = useState(
+    `已将进入编辑器时的局面设为复位点（${initial.pieces.length} 块）`,
+  );
+  const [solveState, setSolveState] = useState<SolveState>({ status: 'idle' });
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<EditorDrag | null>(null);
+  const solverWorkerRef = useRef<Worker | null>(null);
+  const solverRequestRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      solverWorkerRef.current?.terminate();
+    },
+    [],
+  );
+
+  const invalidateSolve = () => {
+    solverWorkerRef.current?.terminate();
+    solverWorkerRef.current = null;
+    solverRequestRef.current += 1;
+    setSolveState({ status: 'idle' });
+  };
+
+  const commitPieces = (next: Piece[]) => {
+    invalidateSolve();
+    setPieces(next);
+    setRender(toRenderPos(next));
+  };
 
   const selected = pieces.find((piece) => piece.id === selectedId) ?? null;
   const occupiedArea = useMemo(
@@ -269,8 +325,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       return;
     }
     const next = [...pieces, candidate];
-    setPieces(next);
-    setRender(toRenderPos(next));
+    commitPieces(next);
     setSelectedId(candidate.id);
     setHoverCell(null);
     setMessage(null);
@@ -284,8 +339,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       return;
     }
     const next = pieces.map((piece) => (piece.id === candidate.id ? candidate : piece));
-    setPieces(next);
-    setRender(toRenderPos(next));
+    commitPieces(next);
     setMessage(null);
   };
 
@@ -306,16 +360,14 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       setMessage('当前空间不足，无法按游戏规则完成旋转');
       return;
     }
-    setPieces(next);
-    setRender(toRenderPos(next));
+    commitPieces(next);
     setMessage(null);
   };
 
   const removeSelected = () => {
     if (!selectedId) return;
     const next = pieces.filter((piece) => piece.id !== selectedId);
-    setPieces(next);
-    setRender(toRenderPos(next));
+    commitPieces(next);
     setSelectedId(null);
     setMessage(null);
   };
@@ -327,6 +379,78 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       return;
     }
     onSave({ id: initial.id, name: name.trim(), pieces: pieces.map((piece) => ({ ...piece })) });
+  };
+
+  const lockCurrentLayout = () => {
+    setLockedPieces(pieces.map((piece) => ({ ...piece })));
+    setWorkspaceMessage(`已锁定当前局面（${pieces.length} 块），之后可随时复位到这里`);
+  };
+
+  const resetToLockedLayout = () => {
+    const restored = lockedPieces.map((piece) => ({ ...piece }));
+    commitPieces(restored);
+    setSelectedId(null);
+    setDraggingId(null);
+    setRotationPreview(null);
+    setHoverCell(null);
+    dragRef.current = null;
+    setMessage(null);
+    setWorkspaceMessage(`已复位到锁定局面（${restored.length} 块）`);
+  };
+
+  const cancelSolve = () => {
+    invalidateSolve();
+  };
+
+  const solveCurrentLayout = () => {
+    const error = validateCustomLayout(name.trim() || '未命名关卡', pieces);
+    if (error) {
+      setMessage(`无法求解：${error}`);
+      return;
+    }
+
+    invalidateSolve();
+    const requestId = solverRequestRef.current;
+    setSolveState({ status: 'solving' });
+    setMessage(null);
+
+    try {
+      const worker = new Worker(new URL('../solver.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+      solverWorkerRef.current = worker;
+      worker.onmessage = (event: MessageEvent<SolverWorkerResponse>) => {
+        if (event.data.requestId !== solverRequestRef.current) return;
+        worker.terminate();
+        solverWorkerRef.current = null;
+        if (event.data.error) {
+          setSolveState({ status: 'error', message: event.data.error });
+          return;
+        }
+        if (event.data.steps === null) {
+          setSolveState({ status: 'unsolvable', elapsedMs: event.data.elapsedMs });
+          return;
+        }
+        setSolveState({
+          status: 'solved',
+          steps: event.data.steps,
+          elapsedMs: event.data.elapsedMs,
+        });
+      };
+      worker.onerror = () => {
+        if (requestId !== solverRequestRef.current) return;
+        worker.terminate();
+        solverWorkerRef.current = null;
+        setSolveState({ status: 'error', message: '自动求解器启动失败' });
+      };
+      worker.postMessage({
+        requestId,
+        pieces: pieces.map((piece) => ({ ...piece })),
+      });
+    } catch {
+      solverWorkerRef.current = null;
+      setSolveState({ status: 'error', message: '当前浏览器无法启动自动求解器' });
+    }
   };
 
   const openExport = () => {
@@ -351,8 +475,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
     try {
       const imported = decodeLayout(layoutCode);
       setName(imported.name);
-      setPieces(imported.pieces);
-      setRender(toRenderPos(imported.pieces));
+      commitPieces(imported.pieces);
       setSelectedId(null);
       setHoverCell(null);
       setMessage(null);
@@ -546,16 +669,16 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       const direction: RotationDirection | null =
         Math.abs(drag.degrees) < 45 ? null : drag.degrees > 0 ? 'clockwise' : 'counterclockwise';
       const next = direction ? rotatePiece(pieces, drag.id, direction) : null;
-      if (next) setPieces(next);
-      setRender(toRenderPos(next ?? pieces));
+      if (next) commitPieces(next);
+      else setRender(toRenderPos(pieces));
     } else if (drag.kind === 'corner') {
       const option = drag.activeOption === null ? null : drag.options[drag.activeOption];
       const next =
         option && Math.abs(drag.degrees) >= 45
           ? turnHandset(pieces, drag.id, option.pivot, option.direction)
           : null;
-      if (next) setPieces(next);
-      setRender(toRenderPos(next ?? pieces));
+      if (next) commitPieces(next);
+      else setRender(toRenderPos(pieces));
     } else if (drag.axis === null) {
       setRender(toRenderPos(pieces));
     } else {
@@ -563,8 +686,8 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
       const origin = axis === 'x' ? drag.originX : drag.originY;
       const target = Math.round(axis === 'x' ? drag.lastX : drag.lastY);
       const next = target === origin ? pieces : movePiece(pieces, drag.id, axis, target);
-      setPieces(next);
-      setRender(toRenderPos(next));
+      if (next !== pieces) commitPieces(next);
+      else setRender(toRenderPos(pieces));
     }
 
     setRotationPreview(null);
@@ -887,6 +1010,45 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
             </Button>
           </div>
         </div>
+
+        <section className="rounded-xl border border-border bg-muted/35 p-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">开局局面与自动解</p>
+            <p className="mt-1 text-xs text-muted-foreground">{workspaceMessage}</p>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={lockCurrentLayout}>
+              <LockKeyIcon size={16} /> 锁定当前局面
+            </Button>
+            <Button variant="outline" size="sm" onClick={resetToLockedLayout}>
+              <ArrowCounterClockwiseIcon size={16} /> 复位到锁定局面
+            </Button>
+            {solveState.status === 'solving' ? (
+              <Button variant="outline" size="sm" onClick={cancelSolve}>
+                <StopIcon size={16} /> 取消求解
+              </Button>
+            ) : (
+              <Button size="sm" onClick={solveCurrentLayout}>
+                <SparkleIcon size={16} /> 自动解
+              </Button>
+            )}
+          </div>
+          <div
+            data-testid="editor-solve-result"
+            aria-live="polite"
+            className="mt-3 rounded-lg border border-border/70 bg-background/70 px-3 py-2 text-sm text-foreground"
+          >
+            {solveState.status === 'idle' && '点击“自动解”检查当前局面是否有解。'}
+            {solveState.status === 'solving' && '正在搜索最短解，复杂局面可能需要一些时间…'}
+            {solveState.status === 'solved' &&
+              (solveState.steps === 0
+                ? `当前已经是获胜状态（0 步，用时 ${formatDuration(solveState.elapsedMs)}）`
+                : `有解，最短需要 ${solveState.steps} 步（用时 ${formatDuration(solveState.elapsedMs)}）`)}
+            {solveState.status === 'unsolvable' &&
+              `当前局面无解（用时 ${formatDuration(solveState.elapsedMs)}）`}
+            {solveState.status === 'error' && solveState.message}
+          </div>
+        </section>
 
         <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
           <span>

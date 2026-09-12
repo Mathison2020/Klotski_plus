@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ButtonHTMLAttributes, OptionHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CUSTOM_LAYOUTS_STORAGE_KEY } from '../custom-layouts';
@@ -41,6 +41,7 @@ describe('关卡编辑器', () => {
   afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   test('创建的布局立即加入列表并在重新挂载后恢复', () => {
@@ -203,5 +204,58 @@ describe('关卡编辑器', () => {
       pointerId: 3,
     });
     expect(screen.getByTestId('piece-three-quarter-disc-1').style.transform).toBe('rotate(90deg)');
+  });
+
+  test('可以锁定当前局面并在继续编辑后复位', () => {
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: '卒 1×1' }));
+    fireEvent.click(screen.getByRole('button', { name: '在第 1 行第 1 列放置棋块' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '锁定当前局面' }));
+    fireEvent.click(screen.getByRole('button', { name: '右移' }));
+    expect(screen.getByTestId('piece-soldier-1').style.left).toBe('25%');
+
+    fireEvent.click(screen.getByRole('button', { name: '复位到锁定局面' }));
+    expect(screen.getByTestId('piece-soldier-1').style.left).toBe('0%');
+    expect(screen.getByText(/已复位到锁定局面/)).toBeTruthy();
+  });
+
+  test('自动解显示最短步数或无解，并在局面变化后清除旧结果', async () => {
+    let nextSteps: number | null = 27;
+    class SolverWorkerMock {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+
+      postMessage(message: { requestId: number }) {
+        queueMicrotask(() => {
+          this.onmessage?.({
+            data: { requestId: message.requestId, steps: nextSteps, elapsedMs: 18 },
+          } as MessageEvent);
+        });
+      }
+
+      terminate() {}
+    }
+    vi.stubGlobal('Worker', SolverWorkerMock);
+
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: '曹操 2×2' }));
+    fireEvent.click(screen.getByRole('button', { name: '在第 1 行第 1 列放置棋块' }));
+    fireEvent.click(screen.getByRole('button', { name: '自动解' }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('editor-solve-result').textContent).toContain('27 步'),
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '右移' }));
+    expect(screen.getByTestId('editor-solve-result').textContent).toContain('检查当前局面');
+
+    nextSteps = null;
+    fireEvent.click(screen.getByRole('button', { name: '自动解' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('editor-solve-result').textContent).toContain('无解'),
+    );
   });
 });
