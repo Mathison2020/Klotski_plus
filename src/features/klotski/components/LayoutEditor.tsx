@@ -811,6 +811,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
                 renderY={hoverPreview.y}
                 selected={false}
                 dragging
+                hitTestable={false}
                 onPointerDown={() => {}}
                 onPointerMove={() => {}}
                 onPointerUp={() => {}}
@@ -936,6 +937,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
                 selected={false}
                 dragging
                 compactPreview
+                hitTestable={false}
                 onPointerDown={() => {}}
                 onPointerMove={() => {}}
                 onPointerUp={() => {}}

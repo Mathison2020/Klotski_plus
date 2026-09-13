@@ -49,6 +49,8 @@ interface PieceProps {
   transitionDurationMs?: number;
   /** 编辑器工具栏的小预览使用无文字、无装饰圆角的简化造型。 */
   compactPreview?: boolean;
+  /** 是否允许图形本体参与指针命中；悬停预览必须关闭以穿透到棋盘格。 */
+  hitTestable?: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -150,6 +152,7 @@ function ThreeQuarterDisc({
   rotationDegrees = 0,
   transitionDurationMs,
   compactPreview = false,
+  hitTestable = true,
   ...events
 }: {
   piece: Piece;
@@ -160,6 +163,7 @@ function ThreeQuarterDisc({
   rotationDegrees?: number;
   transitionDurationMs?: number;
   compactPreview?: boolean;
+  hitTestable?: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -191,7 +195,7 @@ function ThreeQuarterDisc({
     >
       <svg className="h-full w-full overflow-visible" viewBox="0 0 200 200" aria-hidden="true">
         <path
-          className="pointer-events-auto"
+          className={hitTestable ? 'pointer-events-auto' : 'pointer-events-none'}
           d={
             compactPreview
               ? 'M100 100 V2 A98 98 0 1 0 198 100 H100 Z'
@@ -307,6 +311,7 @@ export function Piece({
   rotationTarget,
   transitionDurationMs,
   compactPreview = false,
+  hitTestable = true,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -365,6 +370,7 @@ export function Piece({
         rotationDegrees={rotationDegrees}
         transitionDurationMs={transitionDurationMs}
         compactPreview={compactPreview}
+        hitTestable={hitTestable}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}

@@ -213,6 +213,9 @@ describe('关卡编辑器', () => {
     expect(
       screen.getByTestId('piece-hover-preview').querySelector('path')?.getAttribute('d'),
     ).toContain('V10 Q100 2 92 2');
+    expect(screen.getByTestId('piece-hover-preview').querySelector('path')?.classList).toContain(
+      'pointer-events-none',
+    );
 
     fireEvent.pointerMove(board, { clientX: 350, clientY: 450 });
     expect(screen.getByTestId('placement-hover-preview').dataset.valid).toBe('false');
