@@ -140,6 +140,49 @@ describe('关卡编辑器', () => {
     expect(screen.getByTestId('piece-three-quarter-disc-1').style.transform).toBe('rotate(90deg)');
   });
 
+  test('编辑器使用正确的逆时针图标，并支持双向旋转选中棋块', () => {
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: '半圆 1×2' }));
+
+    const placementCounterclockwise = screen.getByRole('button', {
+      name: '逆时针切换放置朝向',
+    });
+    const reset = screen.getByRole('button', { name: '复位到锁定局面' });
+    expect(placementCounterclockwise.querySelector('svg')?.innerHTML).not.toBe(
+      reset.querySelector('svg')?.innerHTML,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '在第 2 行第 2 列放置棋块' }));
+    const clockwise = screen.getByRole('button', { name: '顺时针旋转选中棋块' });
+    const counterclockwise = screen.getByRole('button', { name: '逆时针旋转选中棋块' });
+    expect((clockwise as HTMLButtonElement).disabled).toBe(false);
+    expect((counterclockwise as HTMLButtonElement).disabled).toBe(false);
+    expect(counterclockwise.querySelector('svg')?.innerHTML).toBe(
+      placementCounterclockwise.querySelector('svg')?.innerHTML,
+    );
+
+    fireEvent.click(clockwise);
+    expect(screen.getByTestId('piece-half-disc-1').style.transform).toBe('rotate(90deg)');
+    fireEvent.click(counterclockwise);
+    expect(screen.getByTestId('piece-half-disc-1').style.transform).toBe('rotate(0deg)');
+  });
+
+  test('选中听筒后可使用顺逆时针按钮滑过对应拐角', () => {
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: '听筒 1×3' }));
+    fireEvent.click(screen.getByRole('button', { name: '在第 3 行第 1 列放置棋块' }));
+
+    fireEvent.click(screen.getByRole('button', { name: '顺时针旋转选中棋块' }));
+    expect(screen.getByTestId('piece-handset-1').style.transform).toBe('rotate(90deg)');
+    expect(screen.getByTestId('piece-handset-1').style.top).toBe('20%');
+
+    fireEvent.click(screen.getByRole('button', { name: '逆时针旋转选中棋块' }));
+    expect(screen.getByTestId('piece-handset-1').style.transform).toBe('rotate(0deg)');
+    expect(screen.getByTestId('piece-handset-1').style.top).toBe('40%');
+  });
+
   test('选择棋块时显示朝向预览，并在棋盘悬停位置显示半透明放置预览', () => {
     render(<KlotskiPage />);
     fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));

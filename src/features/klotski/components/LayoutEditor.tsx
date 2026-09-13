@@ -4,6 +4,7 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   ArrowUpIcon,
+  ArrowsCounterClockwiseIcon,
   ArrowsClockwiseIcon,
   CopyIcon,
   DownloadSimpleIcon,
@@ -349,17 +350,16 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   };
 
   /** 工具栏旋转也严格使用游戏规则；初始朝向请在放置前选择。 */
-  const rotateSelected = () => {
+  const rotateSelected = (direction: RotationDirection) => {
     if (!selected) return;
     let next: Piece[] | null = null;
     if (selected.type === PieceType.HALF_DISC || selected.type === PieceType.THREE_QUARTER_DISC) {
-      next = rotatePiece(pieces, selected.id, 'clockwise');
+      next = rotatePiece(pieces, selected.id, direction);
     } else if (selected.type === PieceType.HANDSET) {
-      for (const pivot of ['start', 'end'] as const) {
-        const direction = handsetTurnDirection(selected, pivot);
-        next = turnHandset(pieces, selected.id, pivot, direction);
-        if (next) break;
-      }
+      const pivot = (['start', 'end'] as const).find(
+        (candidate) => handsetTurnDirection(selected, candidate) === direction,
+      );
+      if (pivot) next = turnHandset(pieces, selected.id, pivot, direction);
     }
     if (!next) {
       setMessage('当前空间不足，无法按游戏规则完成旋转');
@@ -955,7 +955,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
                 onClick={() => changePlacementOrientation(-1)}
                 aria-label="逆时针切换放置朝向"
               >
-                <ArrowCounterClockwiseIcon size={16} />
+                <ArrowsCounterClockwiseIcon size={16} />
               </Button>
               <span className="rounded-md border border-border bg-background px-4 py-1.5 text-sm font-medium text-foreground">
                 {placementLabel}
@@ -1023,8 +1023,21 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
                 selected?.type !== PieceType.THREE_QUARTER_DISC &&
                 selected?.type !== PieceType.HANDSET
               }
-              onClick={rotateSelected}
-              aria-label="按游戏规则旋转棋块"
+              onClick={() => rotateSelected('counterclockwise')}
+              aria-label="逆时针旋转选中棋块"
+            >
+              <ArrowsCounterClockwiseIcon size={16} />
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="outline"
+              disabled={
+                selected?.type !== PieceType.HALF_DISC &&
+                selected?.type !== PieceType.THREE_QUARTER_DISC &&
+                selected?.type !== PieceType.HANDSET
+              }
+              onClick={() => rotateSelected('clockwise')}
+              aria-label="顺时针旋转选中棋块"
             >
               <ArrowsClockwiseIcon size={16} />
             </Button>
