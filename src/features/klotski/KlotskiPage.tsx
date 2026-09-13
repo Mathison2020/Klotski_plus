@@ -97,7 +97,8 @@ interface CornerDragState {
 type DragState = MoveDragState | RotationDragState | CornerDragState;
 
 interface DemoStepAnimation {
-  index: number;
+  fromIndex: number;
+  toIndex: number;
   action: SolverAction;
 }
 
@@ -233,7 +234,11 @@ export function KlotskiPage() {
       }
 
       setPendingSingleStep(false);
-      setActiveDemoStep({ index: playIndex, action: solution[playIndex] });
+      setActiveDemoStep({
+        fromIndex: playIndex,
+        toIndex: playIndex + 1,
+        action: solution[playIndex],
+      });
     }, 0);
     return () => clearTimeout(timer);
   }, [activeDemoStep, pendingSingleStep, playIndex, playing, solution]);
@@ -243,13 +248,14 @@ export function KlotskiPage() {
   useEffect(() => {
     if (!activeDemoStep || solution === null) return;
 
-    const { action, index } = activeDemoStep;
+    const { action, fromIndex, toIndex } = activeDemoStep;
+    const movingForward = toIndex > fromIndex;
     if (action.kind === 'move') {
       let finishTimer: ReturnType<typeof setTimeout> | null = null;
       const frame = requestAnimationFrame(() => {
-        setPlayIndex(index + 1);
+        setPlayIndex(toIndex);
         finishTimer = setTimeout(() => {
-          setSteps((count) => count + 1);
+          if (movingForward) setSteps((count) => count + 1);
           setActiveDemoStep(null);
         }, moveAnimationMs + 20);
       });
@@ -260,9 +266,11 @@ export function KlotskiPage() {
     }
 
     if ((action.kind === 'rotate' || action.kind === 'corner-turn') && demoStart) {
-      const sourcePieces = replay(demoStart, solution, index);
-      const applied = applySolverMove(sourcePieces, action);
-      const targetPiece = applied?.next.find((piece) => piece.id === applied.id);
+      const forwardSource = replay(demoStart, solution, Math.min(fromIndex, toIndex));
+      const applied = applySolverMove(forwardSource, action);
+      const targetPiece = applied
+        ? replay(demoStart, solution, toIndex).find((piece) => piece.id === applied.id)
+        : undefined;
       if (applied && targetPiece) {
         // 棋盘的普通一步很短；旋转至少保留 120ms，并在常用速度下放慢一倍，
         // 否则 90° 的连续帧在人眼看来仍像直接切换。
@@ -275,15 +283,19 @@ export function KlotskiPage() {
           const eased = 1 - (1 - progress) ** 3;
           setRotationPreview({
             id: applied.id,
-            degrees: (action.direction === 'clockwise' ? 1 : -1) * eased * 90,
+            degrees:
+              (action.direction === 'clockwise' ? 1 : -1) *
+              (movingForward ? 1 : -1) *
+              eased *
+              90,
             target: action.kind === 'corner-turn' ? targetPiece : undefined,
           });
           if (progress < 1) {
             frame = requestAnimationFrame(animate);
           } else {
             setRotationPreview(null);
-            setSteps((count) => count + 1);
-            setPlayIndex(index + 1);
+            if (movingForward) setSteps((count) => count + 1);
+            setPlayIndex(toIndex);
             setActiveDemoStep(null);
           }
         };
@@ -330,8 +342,13 @@ export function KlotskiPage() {
       return;
     }
     setPendingSingleStep(false);
-    const next = clamp(playIndex + delta, 0, total);
-    setPlayIndex(next);
+    if (playIndex > 0) {
+      setActiveDemoStep({
+        fromIndex: playIndex,
+        toIndex: playIndex - 1,
+        action: solution[playIndex - 1],
+      });
+    }
   };
 
   const handleSliderChange = (value: number | readonly number[]) => {
