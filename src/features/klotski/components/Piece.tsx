@@ -90,8 +90,9 @@ function Handset({
     height: `${(1 / BOARD_ROWS) * 100}%`,
     transformOrigin: '50% 50%',
     transform: `rotate(${baseAngle + rotationDegrees}deg)`,
+    transitionProperty: dragging ? 'none' : undefined,
     transitionDuration:
-      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
+      dragging || transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   return (
@@ -161,8 +162,9 @@ function ThreeQuarterDisc({
     height: `${(2 / BOARD_ROWS) * 100}%`,
     transformOrigin: '50% 50%',
     transform: `rotate(${angle}deg)`,
+    transitionProperty: dragging ? 'none' : undefined,
     transitionDuration:
-      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
+      dragging || transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   return (
@@ -241,8 +243,9 @@ function HalfDisc({
     height: `${(2 / BOARD_ROWS) * 100}%`,
     transformOrigin: '0% 50%',
     transform: `rotate(${angle}deg)`,
+    transitionProperty: dragging ? 'none' : undefined,
     transitionDuration:
-      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
+      dragging || transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   // 竖放基准图像：右凸半椭圆（x 轴半径=满宽 1 格，y 轴半径=半高 1 格），平边在左。
@@ -347,8 +350,9 @@ export function Piece({
     top: `${(renderY / BOARD_ROWS) * 100}%`,
     width: `${(size.w / BOARD_COLS) * 100}%`,
     height: `${(size.h / BOARD_ROWS) * 100}%`,
+    transitionProperty: dragging ? 'none' : undefined,
     transitionDuration:
-      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
+      dragging || transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   return (

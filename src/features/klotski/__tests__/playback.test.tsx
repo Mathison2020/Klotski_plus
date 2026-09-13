@@ -71,6 +71,8 @@ describe('自动演示动画队列', () => {
     act(() => vi.advanceTimersByTime(80));
     expect(piece.style.transform).not.toBe('rotate(270deg)');
     expect(piece.style.transform).not.toBe('rotate(0deg)');
+    expect(piece.style.transitionProperty).toBe('none');
+    expect(piece.style.transitionDuration).toBe('');
 
     act(() => vi.advanceTimersByTime(200));
     expect(screen.getByText('2 / 51')).toBeTruthy();
