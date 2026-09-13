@@ -935,6 +935,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
                 renderY={toolPreviewPosition.y}
                 selected={false}
                 dragging
+                compactPreview
                 onPointerDown={() => {}}
                 onPointerMove={() => {}}
                 onPointerUp={() => {}}

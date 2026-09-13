@@ -141,10 +141,17 @@ describe('关卡编辑器', () => {
 
     expect(screen.getByLabelText('当前棋块预览')).toBeTruthy();
     expect(screen.getByTestId('piece-tool-preview').style.width).toBe('25%');
+    expect(screen.getByTestId('piece-tool-preview').textContent).toBe('');
+    expect(screen.getByTestId('piece-tool-preview-shape').className).not.toContain('rounded-md');
 
     fireEvent.click(screen.getByRole('button', { name: '3/4圆 3格' }));
     fireEvent.click(screen.getByRole('button', { name: '顺时针切换放置朝向' }));
-    expect(screen.getByTestId('piece-tool-preview').style.transform).toBe('rotate(90deg)');
+    const toolPreview = screen.getByTestId('piece-tool-preview');
+    expect(toolPreview.style.transform).toBe('rotate(90deg)');
+    expect(toolPreview.textContent).toBe('');
+    expect(toolPreview.querySelector('path')?.getAttribute('d')).toBe(
+      'M100 100 V2 A98 98 0 1 0 198 100 H100 Z',
+    );
 
     const board = screen.getByTestId('layout-editor-board');
     fireEvent.pointerMove(board, { clientX: 150, clientY: 250 });
@@ -154,6 +161,10 @@ describe('关卡编辑器', () => {
     expect(screen.getByTestId('piece-hover-preview').style.left).toBe('25%');
     expect(screen.getByTestId('piece-hover-preview').style.top).toBe('40%');
     expect(screen.getByTestId('piece-hover-preview').style.transform).toBe('rotate(90deg)');
+    expect(screen.getByTestId('piece-hover-preview').textContent).toContain('将');
+    expect(
+      screen.getByTestId('piece-hover-preview').querySelector('path')?.getAttribute('d'),
+    ).toContain('V10 Q100 2 92 2');
 
     fireEvent.pointerMove(board, { clientX: 350, clientY: 450 });
     expect(screen.getByTestId('placement-hover-preview').dataset.valid).toBe('false');

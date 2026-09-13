@@ -47,6 +47,8 @@ interface PieceProps {
   rotationTarget?: Piece;
   /** 自动演示时覆盖默认的 150ms 平移时长，使队列等待时间与画面一致。 */
   transitionDurationMs?: number;
+  /** 编辑器工具栏的小预览使用无文字、无装饰圆角的简化造型。 */
+  compactPreview?: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -62,6 +64,7 @@ function Handset({
   rotationDegrees = 0,
   rotationTarget,
   transitionDurationMs,
+  compactPreview = false,
   ...events
 }: {
   piece: Piece;
@@ -72,6 +75,7 @@ function Handset({
   rotationDegrees?: number;
   rotationTarget?: Piece;
   transitionDurationMs?: number;
+  compactPreview?: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -110,18 +114,24 @@ function Handset({
     >
       <svg className="h-full w-full overflow-visible" viewBox="0 0 300 100" aria-hidden="true">
         <path
-          d="M4 0.5 H96 Q100 0.5 100 4.5 C100 30.3 122.386 50.5 150 50.5 C177.614 50.5 200 30.3 200 4.5 Q200 0.5 204 0.5 H296 Q299.5 0.5 299.5 4 C299.5 55.452 254.952 99.5 200 99.5 H100 C45.048 99.5 0.5 55.452 0.5 4 Q0.5 0.5 4 0.5 Z"
+          d={
+            compactPreview
+              ? 'M0.5 0.5 H100 C100 30.3 122.386 50.5 150 50.5 C177.614 50.5 200 30.3 200 0.5 H299.5 V4 C299.5 55.452 254.952 99.5 200 99.5 H100 C45.048 99.5 0.5 55.452 0.5 4 Z'
+              : 'M4 0.5 H96 Q100 0.5 100 4.5 C100 30.3 122.386 50.5 150 50.5 C177.614 50.5 200 30.3 200 4.5 Q200 0.5 204 0.5 H296 Q299.5 0.5 299.5 4 C299.5 55.452 254.952 99.5 200 99.5 H100 C45.048 99.5 0.5 55.452 0.5 4 Q0.5 0.5 4 0.5 Z'
+          }
           transform="translate(3 3) scale(0.98 0.94)"
           fill="var(--secondary)"
           stroke={selected ? 'var(--ring)' : 'var(--border)'}
           strokeWidth={selected ? 2 : 1}
           vectorEffect="non-scaling-stroke"
-          strokeLinejoin="round"
+          strokeLinejoin={compactPreview ? 'miter' : 'round'}
         />
       </svg>
-      <span className="pointer-events-none absolute inset-x-0 top-[72%] -translate-y-1/2 text-center text-sm font-medium text-secondary-foreground">
-        将
-      </span>
+      {!compactPreview && (
+        <span className="pointer-events-none absolute inset-x-0 top-[72%] -translate-y-1/2 text-center text-sm font-medium text-secondary-foreground">
+          将
+        </span>
+      )}
     </div>
   );
 }
@@ -139,6 +149,7 @@ function ThreeQuarterDisc({
   dragging,
   rotationDegrees = 0,
   transitionDurationMs,
+  compactPreview = false,
   ...events
 }: {
   piece: Piece;
@@ -148,6 +159,7 @@ function ThreeQuarterDisc({
   dragging: boolean;
   rotationDegrees?: number;
   transitionDurationMs?: number;
+  compactPreview?: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -180,23 +192,29 @@ function ThreeQuarterDisc({
       <svg className="h-full w-full overflow-visible" viewBox="0 0 200 200" aria-hidden="true">
         <path
           className="pointer-events-auto"
-          d="M100 88 V10 Q100 2 92 2 A98 98 0 1 0 198 108 Q198 100 190 100 H112 Q100 100 100 88 Z"
+          d={
+            compactPreview
+              ? 'M100 100 V2 A98 98 0 1 0 198 100 H100 Z'
+              : 'M100 88 V10 Q100 2 92 2 A98 98 0 1 0 198 108 Q198 100 190 100 H112 Q100 100 100 88 Z'
+          }
           fill="var(--secondary)"
           stroke={selected ? 'var(--ring)' : 'var(--border)'}
           strokeWidth={selected ? 2 : 1}
           vectorEffect="non-scaling-stroke"
-          strokeLinejoin="round"
+          strokeLinejoin={compactPreview ? 'miter' : 'round'}
         />
-        <text
-          x="72"
-          y="126"
-          fill="var(--secondary-foreground)"
-          fontSize="18"
-          fontWeight="500"
-          textAnchor="middle"
-        >
-          将
-        </text>
+        {!compactPreview && (
+          <text
+            x="72"
+            y="126"
+            fill="var(--secondary-foreground)"
+            fontSize="18"
+            fontWeight="500"
+            textAnchor="middle"
+          >
+            将
+          </text>
+        )}
       </svg>
     </div>
   );
@@ -219,6 +237,7 @@ function HalfDisc({
   dragging,
   rotationDegrees = 0,
   transitionDurationMs,
+  compactPreview = false,
   ...events
 }: {
   piece: Piece;
@@ -228,6 +247,7 @@ function HalfDisc({
   dragging: boolean;
   rotationDegrees?: number;
   transitionDurationMs?: number;
+  compactPreview?: boolean;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -249,7 +269,9 @@ function HalfDisc({
   };
 
   // 竖放基准图像：右凸半椭圆（x 轴半径=满宽 1 格，y 轴半径=半高 1 格），平边在左。
-  const radius = '6px 100% 100% 6px / 6px 50% 50% 6px';
+  const radius = compactPreview
+    ? '0 100% 100% 0 / 0 50% 50% 0'
+    : '6px 100% 100% 6px / 6px 50% 50% 6px';
   return (
     <div
       data-testid={`piece-${piece.id}`}
@@ -267,7 +289,9 @@ function HalfDisc({
         }`}
         style={{ borderRadius: radius, overflow: 'hidden' }}
       >
-        <span className="text-sm font-medium text-secondary-foreground">将</span>
+        {!compactPreview && (
+          <span className="text-sm font-medium text-secondary-foreground">将</span>
+        )}
       </div>
     </div>
   );
@@ -282,6 +306,7 @@ export function Piece({
   rotationDegrees,
   rotationTarget,
   transitionDurationMs,
+  compactPreview = false,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -300,6 +325,7 @@ export function Piece({
         dragging={dragging}
         rotationDegrees={rotationDegrees}
         transitionDurationMs={transitionDurationMs}
+        compactPreview={compactPreview}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -319,6 +345,7 @@ export function Piece({
         rotationDegrees={rotationDegrees}
         rotationTarget={rotationTarget}
         transitionDurationMs={transitionDurationMs}
+        compactPreview={compactPreview}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -337,6 +364,7 @@ export function Piece({
         dragging={dragging}
         rotationDegrees={rotationDegrees}
         transitionDurationMs={transitionDurationMs}
+        compactPreview={compactPreview}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -369,13 +397,15 @@ export function Piece({
     >
       <div
         data-testid={`piece-${piece.id}-shape`}
-        className={`flex h-full w-full items-center justify-center rounded-md border border-border font-medium ${VARIANT[piece.type]}${
+        className={`flex h-full w-full items-center justify-center border border-border font-medium ${compactPreview ? '' : 'rounded-md '}${VARIANT[piece.type]}${
           selected ? ' ring-2 ring-ring ring-offset-1' : ''
         }`}
       >
-        <span className={piece.type === PieceType.CAOCAO ? 'text-lg' : 'text-sm'}>
-          {LABEL[piece.type]}
-        </span>
+        {!compactPreview && (
+          <span className={piece.type === PieceType.CAOCAO ? 'text-lg' : 'text-sm'}>
+            {LABEL[piece.type]}
+          </span>
+        )}
       </div>
     </div>
   );
