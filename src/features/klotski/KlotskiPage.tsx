@@ -95,6 +95,11 @@ interface CornerDragState {
 
 type DragState = MoveDragState | RotationDragState | CornerDragState;
 
+interface DemoStepAnimation {
+  index: number;
+  action: SolverAction;
+}
+
 type RenderPos = Record<string, { x: number; y: number }>;
 
 function toRenderPos(pieces: Piece[]): RenderPos {
@@ -185,6 +190,8 @@ export function KlotskiPage() {
   const [demoStart, setDemoStart] = useState<Piece[] | null>(null);
   const [playIndex, setPlayIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [pendingSingleStep, setPendingSingleStep] = useState(false);
+  const [activeDemoStep, setActiveDemoStep] = useState<DemoStepAnimation | null>(null);
   const [speedMs, setSpeedMs] = useState(SPEEDS[1].ms);
   const [editor, setEditor] = useState<LayoutDraft | null>(null);
   const [deleteArmed, setDeleteArmed] = useState(false);
@@ -202,16 +209,49 @@ export function KlotskiPage() {
     [demoPieces, render],
   );
 
-  const won = isWin(boardPieces);
+  const won = isWin(boardPieces) && activeDemoStep === null;
   const selectedPiece = selectedId ? pieces.find((p) => p.id === selectedId) : null;
+  const moveAnimationMs = Math.max(speedMs, 60);
 
-  // 播放引擎：普通步骤定时推进；异形块旋转则复用手动拖动的姿态逐帧播放。
+  // 连续播放与“下一步”共用同一条动画队列；任何时刻只允许一个动作在执行。
   useEffect(() => {
-    if (!playing || solution === null || playIndex >= solution.length) return;
+    if ((!playing && !pendingSingleStep) || activeDemoStep || solution === null) return;
+    const timer = setTimeout(() => {
+      if (playIndex >= solution.length) {
+        setPendingSingleStep(false);
+        setPlaying(false);
+        return;
+      }
 
-    const action = solution[playIndex];
+      setPendingSingleStep(false);
+      setActiveDemoStep({ index: playIndex, action: solution[playIndex] });
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [activeDemoStep, pendingSingleStep, playIndex, playing, solution]);
+
+  // 平移先提交目标坐标，并等待 CSS 位移动画结束；旋转则逐帧绘制到目标姿态。
+  // activeDemoStep 在整个动作期间保持非空，因此下一动作不可能提前开始。
+  useEffect(() => {
+    if (!activeDemoStep || solution === null) return;
+
+    const { action, index } = activeDemoStep;
+    if (action.kind === 'move') {
+      let finishTimer: ReturnType<typeof setTimeout> | null = null;
+      const frame = requestAnimationFrame(() => {
+        setPlayIndex(index + 1);
+        finishTimer = setTimeout(() => {
+          setSteps((count) => count + 1);
+          setActiveDemoStep(null);
+        }, moveAnimationMs + 20);
+      });
+      return () => {
+        cancelAnimationFrame(frame);
+        if (finishTimer !== null) clearTimeout(finishTimer);
+      };
+    }
+
     if ((action.kind === 'rotate' || action.kind === 'corner-turn') && demoStart) {
-      const sourcePieces = replay(demoStart, solution, playIndex);
+      const sourcePieces = replay(demoStart, solution, index);
       const applied = applySolverMove(sourcePieces, action);
       const targetPiece = applied?.next.find((piece) => piece.id === applied.id);
       if (applied && targetPiece) {
@@ -234,7 +274,8 @@ export function KlotskiPage() {
           } else {
             setRotationPreview(null);
             setSteps((count) => count + 1);
-            setPlayIndex((index) => index + 1);
+            setPlayIndex(index + 1);
+            setActiveDemoStep(null);
           }
         };
         frame = requestAnimationFrame(animate);
@@ -242,12 +283,9 @@ export function KlotskiPage() {
       }
     }
 
-    const timer = setTimeout(() => {
-      setSteps((count) => count + 1);
-      setPlayIndex((index) => index + 1);
-    }, speedMs);
+    const timer = setTimeout(() => setActiveDemoStep(null), 0);
     return () => clearTimeout(timer);
-  }, [demoStart, playing, solution, playIndex, speedMs]);
+  }, [activeDemoStep, demoStart, moveAnimationMs, solution, speedMs]);
 
   const startDemo = () => {
     if (won) return;
@@ -256,6 +294,8 @@ export function KlotskiPage() {
     setDemoStart(pieces);
     setSolution(s);
     setPlayIndex(0);
+    setPendingSingleStep(false);
+    setActiveDemoStep(null);
     setPlaying(true);
   };
 
@@ -264,26 +304,33 @@ export function KlotskiPage() {
       startDemo();
     } else if (playIndex >= total) {
       setPlayIndex(0);
+      setPendingSingleStep(false);
+      setActiveDemoStep(null);
       setPlaying(true);
     } else {
-      if (playing) setRotationPreview(null);
       setPlaying((p) => !p);
     }
   };
 
   const stepBy = (delta: number) => {
-    if (solution === null) return;
+    if (solution === null || activeDemoStep) return;
     setPlaying(false);
     setRotationPreview(null);
+    if (delta > 0) {
+      if (playIndex < total) setPendingSingleStep(true);
+      return;
+    }
+    setPendingSingleStep(false);
     const next = clamp(playIndex + delta, 0, total);
-    if (next > playIndex) setSteps((count) => count + next - playIndex);
     setPlayIndex(next);
   };
 
   const handleSliderChange = (value: number | readonly number[]) => {
     if (solution === null) return;
+    if (activeDemoStep) return;
     const next = Array.isArray(value) ? Number(value[0]) : Number(value);
     setPlaying(false);
+    setPendingSingleStep(false);
     setRotationPreview(null);
     const nextIndex = clamp(next, 0, total);
     if (nextIndex > playIndex) setSteps((count) => count + nextIndex - playIndex);
@@ -291,7 +338,7 @@ export function KlotskiPage() {
   };
 
   const rotateSelected = (direction: RotationDirection = 'clockwise') => {
-    if (selectedId === null || playing) return;
+    if (selectedId === null || playing || activeDemoStep) return;
     const rotated = rotatePiece(pieces, selectedId, direction);
     if (!rotated) return;
     setPieces(rotated);
@@ -300,7 +347,7 @@ export function KlotskiPage() {
   };
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
-    if (playing) return;
+    if (playing || activeDemoStep) return;
     const wantsPieceRotation =
       e.button === 2 &&
       (piece.type === PieceType.HALF_DISC || piece.type === PieceType.THREE_QUARTER_DISC);
@@ -313,6 +360,8 @@ export function KlotskiPage() {
       setSolution(null);
       setDemoStart(null);
       setPlayIndex(0);
+      setPendingSingleStep(false);
+      setActiveDemoStep(null);
       setPieces(boardPieces);
       setRender(toRenderPos(boardPieces));
     }
@@ -557,6 +606,8 @@ export function KlotskiPage() {
     setDemoStart(null);
     setPlayIndex(0);
     setPlaying(false);
+    setPendingSingleStep(false);
+    setActiveDemoStep(null);
     setPieces(layout.pieces);
     setRender(toRenderPos(layout.pieces));
     setSelectedId(null);
@@ -592,6 +643,8 @@ export function KlotskiPage() {
     setDemoStart(null);
     setPlayIndex(0);
     setPlaying(false);
+    setPendingSingleStep(false);
+    setActiveDemoStep(null);
     setPieces(saved.pieces);
     setRender(toRenderPos(saved.pieces));
     setSelectedId(null);
@@ -621,6 +674,8 @@ export function KlotskiPage() {
     setDemoStart(null);
     setPlayIndex(0);
     setPlaying(false);
+    setPendingSingleStep(false);
+    setActiveDemoStep(null);
     setSteps(0);
   };
 
@@ -706,6 +761,7 @@ export function KlotskiPage() {
               dragging={piece.id === draggingId || piece.id === rotationPreview?.id}
               rotationDegrees={rotationPreview?.id === piece.id ? rotationPreview.degrees : 0}
               rotationTarget={rotationPreview?.id === piece.id ? rotationPreview.target : undefined}
+              transitionDurationMs={solution === null ? undefined : moveAnimationMs}
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={handlePointerUp}
@@ -731,7 +787,7 @@ export function KlotskiPage() {
               min={0}
               max={solution === null ? 1 : total}
               step={1}
-              disabled={solution === null}
+              disabled={solution === null || activeDemoStep !== null}
               onValueChange={handleSliderChange}
             />
           </div>
@@ -746,7 +802,7 @@ export function KlotskiPage() {
               variant="outline"
               size="icon-sm"
               onClick={() => stepBy(-1)}
-              disabled={solution === null || playIndex <= 0}
+              disabled={solution === null || playIndex <= 0 || activeDemoStep !== null}
               aria-label="上一步"
             >
               <CaretLeftIcon size={16} />
@@ -755,6 +811,7 @@ export function KlotskiPage() {
               variant="outline"
               size="icon-sm"
               onClick={togglePlay}
+              disabled={activeDemoStep !== null && !playing}
               aria-label={playing ? '暂停演示' : solution === null ? '开始演示' : '继续演示'}
             >
               {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
@@ -763,7 +820,7 @@ export function KlotskiPage() {
               variant="outline"
               size="icon-sm"
               onClick={() => stepBy(1)}
-              disabled={solution === null || playIndex >= total}
+              disabled={solution === null || playIndex >= total || activeDemoStep !== null}
               aria-label="下一步"
             >
               <CaretRightIcon size={16} />
@@ -777,6 +834,7 @@ export function KlotskiPage() {
                 variant={speedMs === s.ms ? 'default' : 'outline'}
                 size="xs"
                 onClick={() => setSpeedMs(s.ms)}
+                disabled={activeDemoStep !== null}
               >
                 {s.label}
               </Button>
@@ -790,7 +848,8 @@ export function KlotskiPage() {
             disabled={
               (selectedPiece?.type !== PieceType.HALF_DISC &&
                 selectedPiece?.type !== PieceType.THREE_QUARTER_DISC) ||
-              playing
+              playing ||
+              activeDemoStep !== null
             }
             aria-label="顺时针旋转棋块"
             title="顺时针旋转选中的半圆或3/4圆（也可按住右键环绕拖动）"

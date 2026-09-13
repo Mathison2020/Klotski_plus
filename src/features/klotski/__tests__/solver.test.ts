@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { HENG_DAO_LI_MA, LAYOUTS, THREE_QUARTER_SANDBOX } from '../layouts';
+import { DOUBLE_MOON_SPIN, HENG_DAO_LI_MA, LAYOUTS, THREE_QUARTER_SANDBOX } from '../layouts';
 import { solveKlotski, type SolverAction } from '../solver';
 import {
   getHandsetOrientation,
@@ -162,6 +162,18 @@ describe('solveKlotski', () => {
 });
 
 describe('预设关卡', () => {
+  test('双月回旋只留两格空位且最短解为 51 步', () => {
+    const occupiedArea = DOUBLE_MOON_SPIN.pieces.reduce(
+      (area, piece) => area + getOccupiedArea(piece),
+      0,
+    );
+    const moves = solveKlotski(DOUBLE_MOON_SPIN.pieces);
+
+    expect(occupiedArea).toBe(BOARD_COLS * BOARD_ROWS - 2);
+    expect(moves).toHaveLength(51);
+    expect(isWin(applyMoves(DOUBLE_MOON_SPIN.pieces, moves!))).toBe(true);
+  });
+
   test('缺月重围只留两格空位且需要旋转3/4圆才能以最短路径通关', () => {
     const occupiedArea = THREE_QUARTER_SANDBOX.pieces.reduce(
       (area, piece) => area + getOccupiedArea(piece),

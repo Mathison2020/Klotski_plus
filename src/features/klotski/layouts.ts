@@ -139,6 +139,36 @@ export const THREE_QUARTER_SANDBOX: Layout = {
 };
 
 /**
+ * 双月回旋 —— 两个 3/4 圆与一个半圆共同封锁通道。
+ * 仅留下两格自由空间；最短解 51 步。
+ */
+export const DOUBLE_MOON_SPIN: Layout = {
+  name: '双月回旋',
+  pieces: [
+    { id: 'caocao', type: CAOCAO, x: 0, y: 0 },
+    { id: 'hengjiang', type: GENERAL_H, x: 2, y: 0 },
+    { id: 'shujiang', type: GENERAL_V, x: 0, y: 2 },
+    { id: 'zu1', type: SOLDIER, x: 3, y: 1 },
+    {
+      id: 'three-quarter-1',
+      type: THREE_QUARTER_DISC,
+      x: 1,
+      y: 1,
+      threeQuarterOrientation: ThreeQuarterOrientation.TOP_LEFT,
+    },
+    { id: 'zu2', type: SOLDIER, x: 1, y: 3 },
+    { id: 'half', type: HALF_DISC, x: 0, y: 4, orientation: Orientation.DOWN },
+    {
+      id: 'three-quarter-2',
+      type: THREE_QUARTER_DISC,
+      x: 2,
+      y: 2,
+      threeQuarterOrientation: ThreeQuarterOrientation.TOP_LEFT,
+    },
+  ],
+};
+
+/**
  * 辗转腾挪 —— 由“横刀立马”把左下竖将和其下方小卒合并为三格听筒。
  * 仅留下两格自由空间；最短解 81 步，其中必须完成 6 次转角动作。
  */
@@ -173,5 +203,6 @@ export const LAYOUTS: Layout[] = [
   CENG_CENG_SHE_FANG,
   HALF_DISC_SANDBOX,
   THREE_QUARTER_SANDBOX,
+  DOUBLE_MOON_SPIN,
   HANDSET_SANDBOX,
 ];

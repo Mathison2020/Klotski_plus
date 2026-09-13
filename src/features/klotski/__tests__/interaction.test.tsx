@@ -125,7 +125,9 @@ describe('半圆块交互', () => {
 
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: '开始演示' }));
-    act(() => vi.advanceTimersByTime(200));
+    act(() => vi.advanceTimersByTime(0));
+    act(() => vi.advanceTimersByTime(20));
+    act(() => vi.advanceTimersByTime(160));
     expect(screen.getByText(/演示模式 · 步数 2/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '暂停演示' }));
     vi.useRealTimers();

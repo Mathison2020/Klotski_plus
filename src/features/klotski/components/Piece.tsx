@@ -45,6 +45,8 @@ interface PieceProps {
   rotationDegrees?: number;
   /** 听筒转角动作的目标状态，用于计算半圆中心轨迹。 */
   rotationTarget?: Piece;
+  /** 自动演示时覆盖默认的 150ms 平移时长，使队列等待时间与画面一致。 */
+  transitionDurationMs?: number;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -59,6 +61,7 @@ function Handset({
   dragging,
   rotationDegrees = 0,
   rotationTarget,
+  transitionDurationMs,
   ...events
 }: {
   piece: Piece;
@@ -68,6 +71,7 @@ function Handset({
   dragging: boolean;
   rotationDegrees?: number;
   rotationTarget?: Piece;
+  transitionDurationMs?: number;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -86,6 +90,8 @@ function Handset({
     height: `${(1 / BOARD_ROWS) * 100}%`,
     transformOrigin: '50% 50%',
     transform: `rotate(${baseAngle + rotationDegrees}deg)`,
+    transitionDuration:
+      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   return (
@@ -131,6 +137,7 @@ function ThreeQuarterDisc({
   selected,
   dragging,
   rotationDegrees = 0,
+  transitionDurationMs,
   ...events
 }: {
   piece: Piece;
@@ -139,6 +146,7 @@ function ThreeQuarterDisc({
   selected: boolean;
   dragging: boolean;
   rotationDegrees?: number;
+  transitionDurationMs?: number;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -153,6 +161,8 @@ function ThreeQuarterDisc({
     height: `${(2 / BOARD_ROWS) * 100}%`,
     transformOrigin: '50% 50%',
     transform: `rotate(${angle}deg)`,
+    transitionDuration:
+      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   return (
@@ -206,6 +216,7 @@ function HalfDisc({
   selected,
   dragging,
   rotationDegrees = 0,
+  transitionDurationMs,
   ...events
 }: {
   piece: Piece;
@@ -214,6 +225,7 @@ function HalfDisc({
   selected: boolean;
   dragging: boolean;
   rotationDegrees?: number;
+  transitionDurationMs?: number;
   onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (e: ReactPointerEvent<HTMLDivElement>) => void;
@@ -229,6 +241,8 @@ function HalfDisc({
     height: `${(2 / BOARD_ROWS) * 100}%`,
     transformOrigin: '0% 50%',
     transform: `rotate(${angle}deg)`,
+    transitionDuration:
+      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   // 竖放基准图像：右凸半椭圆（x 轴半径=满宽 1 格，y 轴半径=半高 1 格），平边在左。
@@ -264,6 +278,7 @@ export function Piece({
   dragging,
   rotationDegrees,
   rotationTarget,
+  transitionDurationMs,
   onPointerDown,
   onPointerMove,
   onPointerUp,
@@ -281,6 +296,7 @@ export function Piece({
         selected={selected}
         dragging={dragging}
         rotationDegrees={rotationDegrees}
+        transitionDurationMs={transitionDurationMs}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -299,6 +315,7 @@ export function Piece({
         dragging={dragging}
         rotationDegrees={rotationDegrees}
         rotationTarget={rotationTarget}
+        transitionDurationMs={transitionDurationMs}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -316,6 +333,7 @@ export function Piece({
         selected={selected}
         dragging={dragging}
         rotationDegrees={rotationDegrees}
+        transitionDurationMs={transitionDurationMs}
         onPointerDown={(e) => onPointerDown(e, piece)}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -329,6 +347,8 @@ export function Piece({
     top: `${(renderY / BOARD_ROWS) * 100}%`,
     width: `${(size.w / BOARD_COLS) * 100}%`,
     height: `${(size.h / BOARD_ROWS) * 100}%`,
+    transitionDuration:
+      transitionDurationMs === undefined ? undefined : `${transitionDurationMs}ms`,
   };
 
   return (
