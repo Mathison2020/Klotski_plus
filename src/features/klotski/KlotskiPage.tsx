@@ -35,6 +35,7 @@ import {
   turnHandset,
 } from './engine';
 import { LAYOUTS } from './layouts';
+import { animateAngleSnap } from './snap-animation';
 import { solveKlotski, type SolverAction } from './solver';
 import { PieceType, type HandsetPivot, type Piece, type RotationDirection } from './types';
 
@@ -197,6 +198,14 @@ export function KlotskiPage() {
   const [deleteArmed, setDeleteArmed] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const cornerSnapCancelRef = useRef<(() => void) | null>(null);
+
+  useEffect(
+    () => () => {
+      cornerSnapCancelRef.current?.();
+    },
+    [],
+  );
 
   const total = solution?.length ?? 0;
   const demoPieces = useMemo(
@@ -347,7 +356,7 @@ export function KlotskiPage() {
   };
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
-    if (playing || activeDemoStep) return;
+    if (playing || activeDemoStep || cornerSnapCancelRef.current) return;
     const wantsPieceRotation =
       e.button === 2 &&
       (piece.type === PieceType.HALF_DISC || piece.type === PieceType.THREE_QUARTER_DISC);
@@ -538,26 +547,51 @@ export function KlotskiPage() {
     const drag = dragRef.current;
     if (!drag) return;
 
-    if (drag.kind === 'rotate' || drag.kind === 'corner') {
-      const cornerOption =
-        drag.kind === 'corner' && drag.activeOption !== null
-          ? drag.options[drag.activeOption]
+    if (drag.kind === 'corner') {
+      const option = drag.activeOption === null ? null : drag.options[drag.activeOption];
+      const shouldCommit = option !== null && Math.abs(drag.degrees) >= 45;
+      const next =
+        shouldCommit && option
+          ? turnHandset(pieces, drag.id, option.pivot, option.direction)
           : null;
+      const targetDegrees = next && option ? (option.direction === 'clockwise' ? 90 : -90) : 0;
+
+      dragRef.current = null;
+      if (!option || Math.abs(targetDegrees - drag.degrees) < 0.01) {
+        if (next) {
+          setPieces(next);
+          setRender(toRenderPos(next));
+          setSteps((count) => count + 1);
+        }
+        setRotationPreview(null);
+        setDraggingId(null);
+        return;
+      }
+
+      const finish = () => {
+        cornerSnapCancelRef.current = null;
+        if (next) {
+          setPieces(next);
+          setRender(toRenderPos(next));
+          setSteps((count) => count + 1);
+        }
+        setRotationPreview(null);
+        setDraggingId(null);
+      };
+      cornerSnapCancelRef.current = animateAngleSnap({
+        from: drag.degrees,
+        to: targetDegrees,
+        onFrame: (degrees) => setRotationPreview({ id: drag.id, degrees, target: option.target }),
+        onComplete: finish,
+      });
+      return;
+    }
+
+    if (drag.kind === 'rotate') {
       const direction: RotationDirection | null =
-        Math.abs(drag.degrees) < 45
-          ? null
-          : drag.kind === 'corner'
-            ? (cornerOption?.direction ?? null)
-            : drag.degrees > 0
-              ? 'clockwise'
-              : 'counterclockwise';
+        Math.abs(drag.degrees) < 45 ? null : drag.degrees > 0 ? 'clockwise' : 'counterclockwise';
       if (direction) {
-        const rotated =
-          drag.kind === 'rotate'
-            ? rotatePiece(pieces, drag.id, direction)
-            : cornerOption
-              ? turnHandset(pieces, drag.id, cornerOption.pivot, direction)
-              : null;
+        const rotated = rotatePiece(pieces, drag.id, direction);
         if (rotated) {
           setPieces(rotated);
           setRender(toRenderPos(rotated));
@@ -601,6 +635,8 @@ export function KlotskiPage() {
   const loadLayout = (idx: number) => {
     const layout = layouts[idx];
     if (!layout) return;
+    cornerSnapCancelRef.current?.();
+    cornerSnapCancelRef.current = null;
     setLayoutIdx(idx);
     setSolution(null);
     setDemoStart(null);

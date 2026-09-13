@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ButtonHTMLAttributes, OptionHTMLAttributes, SelectHTMLAttributes } from 'react';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { CUSTOM_LAYOUTS_STORAGE_KEY } from '../custom-layouts';
@@ -40,6 +40,7 @@ describe('关卡编辑器', () => {
   });
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -204,6 +205,29 @@ describe('关卡编辑器', () => {
       pointerId: 3,
     });
     expect(screen.getByTestId('piece-three-quarter-disc-1').style.transform).toBe('rotate(90deg)');
+  });
+
+  test('编辑器内听筒松手后沿转角轨迹吸附', () => {
+    vi.useFakeTimers();
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('button', { name: /新建关卡/ }));
+    fireEvent.click(screen.getByRole('button', { name: '听筒 1×3' }));
+    fireEvent.click(screen.getByRole('button', { name: '在第 5 行第 1 列放置棋块' }));
+
+    let handset = screen.getByTestId('piece-handset-1');
+    fireEvent.pointerDown(handset, { button: 2, clientX: 250, clientY: 450, pointerId: 10 });
+    fireEvent.pointerMove(handset, { button: 2, clientX: 250, clientY: 400, pointerId: 10 });
+    fireEvent.pointerUp(handset, { button: 2, clientX: 250, clientY: 400, pointerId: 10 });
+
+    expect(handset.style.transform).toBe('rotate(-45deg)');
+    expect(handset.style.transitionProperty).toBe('none');
+    act(() => vi.advanceTimersByTime(48));
+    expect(handset.style.transform).not.toBe('rotate(-45deg)');
+    expect(handset.style.transform).not.toBe('rotate(-90deg)');
+
+    act(() => vi.advanceTimersByTime(100));
+    handset = screen.getByTestId('piece-handset-1');
+    expect(handset.style.transform).toBe('rotate(-90deg)');
   });
 
   test('可以锁定当前局面并在继续编辑后复位', () => {

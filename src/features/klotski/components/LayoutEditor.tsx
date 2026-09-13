@@ -26,6 +26,7 @@ import {
 import { BOARD_COLS, BOARD_ROWS } from '../constants';
 import { validateCustomLayout } from '../custom-layouts';
 import { decodeLayout, encodeLayout, LayoutCodeError } from '../layout-codec';
+import { animateAngleSnap } from '../snap-animation';
 import {
   computeRange,
   discCenter,
@@ -237,12 +238,14 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   const [solveState, setSolveState] = useState<SolveState>({ status: 'idle' });
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<EditorDrag | null>(null);
+  const cornerSnapCancelRef = useRef<(() => void) | null>(null);
   const solverWorkerRef = useRef<Worker | null>(null);
   const solverRequestRef = useRef(0);
 
   useEffect(
     () => () => {
       solverWorkerRef.current?.terminate();
+      cornerSnapCancelRef.current?.();
     },
     [],
   );
@@ -255,6 +258,8 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   };
 
   const commitPieces = (next: Piece[]) => {
+    cornerSnapCancelRef.current?.();
+    cornerSnapCancelRef.current = null;
     invalidateSolve();
     setPieces(next);
     setRender(toRenderPos(next));
@@ -495,6 +500,7 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
+    if (cornerSnapCancelRef.current) return;
     const wantsPieceRotation =
       event.button === 2 &&
       (piece.type === PieceType.HALF_DISC || piece.type === PieceType.THREE_QUARTER_DISC);
@@ -677,8 +683,30 @@ export function LayoutEditor({ initial, onCancel, onSave }: LayoutEditorProps) {
         option && Math.abs(drag.degrees) >= 45
           ? turnHandset(pieces, drag.id, option.pivot, option.direction)
           : null;
-      if (next) commitPieces(next);
-      else setRender(toRenderPos(pieces));
+      const targetDegrees = next && option ? (option.direction === 'clockwise' ? 90 : -90) : 0;
+
+      dragRef.current = null;
+      if (!option || Math.abs(targetDegrees - drag.degrees) < 0.01) {
+        if (next) commitPieces(next);
+        else setRender(toRenderPos(pieces));
+        setRotationPreview(null);
+        setDraggingId(null);
+        return;
+      }
+
+      cornerSnapCancelRef.current = animateAngleSnap({
+        from: drag.degrees,
+        to: targetDegrees,
+        onFrame: (degrees) => setRotationPreview({ id: drag.id, degrees, target: option.target }),
+        onComplete: () => {
+          cornerSnapCancelRef.current = null;
+          if (next) commitPieces(next);
+          else setRender(toRenderPos(pieces));
+          setRotationPreview(null);
+          setDraggingId(null);
+        },
+      });
+      return;
     } else if (drag.axis === null) {
       setRender(toRenderPos(pieces));
     } else {

@@ -165,6 +165,7 @@ describe('半圆块交互', () => {
   });
 
   test('听筒右键拖动转角后仍可左键平移', () => {
+    vi.useFakeTimers();
     render(<KlotskiPage />);
     selectLayout('辗转腾挪');
 
@@ -177,12 +178,20 @@ describe('半圆块交互', () => {
     expect(handset.style.left).toBe('37.5%');
     expect(handset.style.top).toBe('70%');
 
-    fireEvent.pointerMove(handset, { button: 2, clientX: 375, clientY: 350, pointerId: 3 });
-    expect(handset.style.transform).toBe('rotate(-90deg)');
-    expect(handset.style.left).toBe('50%');
-    expect(handset.style.top).toBe('60%');
+    // 在半程松手，吸附必须继续沿相同圆弧补完，而不是直接提交终点后做 left/top 直线过渡。
+    fireEvent.pointerUp(handset, { button: 2, clientX: 375, clientY: 400, pointerId: 3 });
+    expect(handset.style.transform).toBe('rotate(-45deg)');
+    expect(handset.style.left).toBe('37.5%');
+    expect(handset.style.top).toBe('70%');
+    expect(handset.style.transitionProperty).toBe('none');
 
-    fireEvent.pointerUp(handset, { button: 2, clientX: 375, clientY: 350, pointerId: 3 });
+    act(() => vi.advanceTimersByTime(48));
+    expect(handset.style.transform).not.toBe('rotate(-45deg)');
+    expect(handset.style.transform).not.toBe('rotate(-90deg)');
+    expect(handset.style.left).not.toBe('37.5%');
+    expect(handset.style.left).not.toBe('50%');
+
+    act(() => vi.advanceTimersByTime(100));
     handset = screen.getByLabelText('电话听筒块');
     expect(handset.style.transform).toBe('rotate(-90deg)');
     expect(handset.style.left).toBe('50%');
