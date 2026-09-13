@@ -45,8 +45,8 @@ vi.mock('../layouts', () => ({
 }));
 
 function selectLayout(name: string) {
-  const option = screen.getByRole('option', { name }) as HTMLOptionElement;
-  fireEvent.change(screen.getByRole('combobox'), { target: { value: option.value } });
+  fireEvent.click(screen.getByRole('combobox', { name: '选择关卡' }));
+  fireEvent.click(screen.getByRole('option', { name }));
 }
 
 vi.mock('@/components/ui', () => ({

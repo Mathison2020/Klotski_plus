@@ -193,6 +193,59 @@ export const HANDSET_SANDBOX: Layout = {
   ],
 };
 
+/**
+ * 月满重门 —— 四枚半圆上下呼应，必须反复调整弧面才能打开出口。
+ * 仅留下两格自由空间；最短解 41 步。
+ */
+export const FOUR_MOON_GATE: Layout = {
+  name: '月满重门',
+  pieces: [
+    { id: 'caocao-1', type: CAOCAO, x: 1, y: 0 },
+    { id: 'general-v-1', type: GENERAL_V, x: 3, y: 0 },
+    { id: 'general-v-2', type: GENERAL_V, x: 0, y: 0 },
+    { id: 'half-disc-1', type: HALF_DISC, x: 0, y: 2, orientation: Orientation.DOWN },
+    { id: 'half-disc-2', type: HALF_DISC, x: 2, y: 2, orientation: Orientation.DOWN },
+    { id: 'general-h-1', type: GENERAL_H, x: 1, y: 3 },
+    { id: 'half-disc-3', type: HALF_DISC, x: 0, y: 4, orientation: Orientation.UP },
+    { id: 'half-disc-4', type: HALF_DISC, x: 2, y: 4, orientation: Orientation.UP },
+  ],
+};
+
+/**
+ * 虚张声势 —— 两枚听筒、两枚半圆与一个 3/4 圆看似严密封锁出口。
+ * 仅留下两格自由空间；最短解 27 步。
+ */
+export const EMPTY_BLUSTER: Layout = {
+  name: '虚张声势',
+  pieces: [
+    { id: 'caocao-1', type: CAOCAO, x: 1, y: 0 },
+    {
+      id: 'handset-1',
+      type: HANDSET,
+      x: 0,
+      y: 0,
+      handsetOrientation: HandsetOrientation.RIGHT,
+    },
+    {
+      id: 'handset-2',
+      type: HANDSET,
+      x: 3,
+      y: 0,
+      handsetOrientation: HandsetOrientation.LEFT,
+    },
+    { id: 'half-disc-1', type: HALF_DISC, x: 3, y: 3, orientation: Orientation.RIGHT },
+    { id: 'half-disc-2', type: HALF_DISC, x: 0, y: 3, orientation: Orientation.LEFT },
+    {
+      id: 'three-quarter-disc-1',
+      type: THREE_QUARTER_DISC,
+      x: 1,
+      y: 2,
+      threeQuarterOrientation: ThreeQuarterOrientation.TOP_RIGHT,
+    },
+    { id: 'soldier-1', type: SOLDIER, x: 2, y: 2 },
+  ],
+};
+
 /** 全部关卡（后续新增布局在此追加）。 */
 export const LAYOUTS: Layout[] = [
   HENG_DAO_LI_MA,
@@ -205,4 +258,6 @@ export const LAYOUTS: Layout[] = [
   THREE_QUARTER_SANDBOX,
   DOUBLE_MOON_SPIN,
   HANDSET_SANDBOX,
+  FOUR_MOON_GATE,
+  EMPTY_BLUSTER,
 ];

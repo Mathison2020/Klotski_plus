@@ -9,15 +9,17 @@ import {
   ArrowCounterClockwiseIcon,
   ArrowsCounterClockwiseIcon,
   ArrowsClockwiseIcon,
+  CaretDownIcon,
   CaretLeftIcon,
   CaretRightIcon,
+  CheckIcon,
   PencilSimpleIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
-import { Button, NativeSelect, NativeSelectOption, Slider } from '@/components/ui';
+import { Button, Slider } from '@/components/ui';
 import { Board, LayoutEditor, Piece as PieceView, type LayoutDraft } from './components';
 import { BOARD_COLS, BOARD_ROWS } from './constants';
 import { loadCustomLayouts, persistCustomLayouts, type CustomLayout } from './custom-layouts';
@@ -192,6 +194,119 @@ function resolveButtonRotation(
 
   const target = next?.find((candidate) => candidate.id === id);
   return next && target ? { next, target } : null;
+}
+
+const TRADITIONAL_PIECE_TYPES = new Set<Piece['type']>([
+  PieceType.CAOCAO,
+  PieceType.GENERAL_H,
+  PieceType.GENERAL_V,
+  PieceType.SOLDIER,
+]);
+
+function isTraditionalLayout(pieces: Piece[]): boolean {
+  return pieces.every((piece) => TRADITIONAL_PIECE_TYPES.has(piece.type));
+}
+
+interface LayoutPickerProps {
+  layouts: { name: string; pieces: Piece[] }[];
+  presetCount: number;
+  value: number;
+  onChange: (index: number) => void;
+}
+
+/** 两列关卡选择器：传统棋块与异形棋块各占一列，自定义关卡按实际内容归类。 */
+function LayoutPicker({ layouts, presetCount, value, onChange }: LayoutPickerProps) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const entries = layouts.map((layout, index) => ({
+    index,
+    label: index >= presetCount ? `自定义 · ${layout.name}` : layout.name,
+    traditional: isTraditionalLayout(layout.pieces),
+  }));
+  const groups = [
+    { title: '传统华容道', entries: entries.filter((entry) => entry.traditional) },
+    { title: '异形块关卡', entries: entries.filter((entry) => !entry.traditional) },
+  ];
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || !rootRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <button
+        type="button"
+        role="combobox"
+        aria-label="选择关卡"
+        aria-expanded={open}
+        aria-controls="layout-picker-options"
+        aria-haspopup="listbox"
+        className="inline-flex h-8 min-w-36 items-center justify-between gap-2 rounded-lg border border-input bg-background px-2.5 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+        onClick={() => setOpen((current) => !current)}
+        onKeyDown={(event) => {
+          if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+      >
+        <span className="truncate">{entries[value]?.label ?? '选择关卡'}</span>
+        <CaretDownIcon
+          aria-hidden="true"
+          className={`size-4 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+
+      {open && (
+        <div
+          id="layout-picker-options"
+          role="listbox"
+          aria-label="关卡列表"
+          className="absolute top-full left-1/2 z-50 mt-2 grid w-[min(420px,calc(100vw-2rem))] -translate-x-1/2 grid-cols-2 gap-2 rounded-xl border border-border bg-card p-2 shadow-lg"
+        >
+          {groups.map((group) => (
+            <div key={group.title} role="group" aria-label={group.title} className="min-w-0">
+              <p className="px-2 py-1.5 text-xs font-medium text-muted-foreground">{group.title}</p>
+              <div className="flex flex-col gap-0.5">
+                {group.entries.map((entry) => (
+                  <button
+                    key={entry.index}
+                    type="button"
+                    role="option"
+                    aria-selected={entry.index === value}
+                    className={`flex min-w-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-sm outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring ${
+                      entry.index === value ? 'bg-primary/10 text-primary' : 'text-foreground'
+                    }`}
+                    onClick={() => {
+                      onChange(entry.index);
+                      setOpen(false);
+                    }}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{entry.label}</span>
+                    {entry.index === value && <CheckIcon className="size-3.5 shrink-0" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** 华容道页面：连续拖动移动、点击高亮、关卡切换、一键求解演示（可调速/暂停/步进/拖进度条）。 */
@@ -829,13 +944,12 @@ export function KlotskiPage() {
 
       <div className="flex w-full max-w-[340px] items-center justify-center gap-3">
         <span className="text-sm text-muted-foreground">关卡</span>
-        <NativeSelect value={layoutIdx} onChange={(e) => loadLayout(Number(e.currentTarget.value))}>
-          {layouts.map((layout, i) => (
-            <NativeSelectOption key={i} value={i}>
-              {i >= LAYOUTS.length ? `自定义 · ${layout.name}` : layout.name}
-            </NativeSelectOption>
-          ))}
-        </NativeSelect>
+        <LayoutPicker
+          layouts={layouts}
+          presetCount={LAYOUTS.length}
+          value={layoutIdx}
+          onChange={loadLayout}
+        />
       </div>
 
       <div className="flex items-center justify-center gap-2">

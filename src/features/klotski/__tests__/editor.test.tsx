@@ -19,6 +19,11 @@ vi.mock('@/components/ui', () => ({
   Slider: () => <input aria-label="演示进度" type="range" disabled />,
 }));
 
+function expectCustomLayoutInMenu(name: string) {
+  fireEvent.click(screen.getByRole('combobox', { name: '选择关卡' }));
+  expect(screen.getByRole('option', { name: `自定义 · ${name}` })).toBeTruthy();
+}
+
 describe('关卡编辑器', () => {
   beforeEach(() => {
     globalThis.localStorage.clear();
@@ -53,12 +58,12 @@ describe('关卡编辑器', () => {
     fireEvent.click(screen.getByRole('button', { name: '在第 1 行第 2 列放置棋块' }));
     fireEvent.click(screen.getByRole('button', { name: /保存关卡/ }));
 
-    expect(screen.getByRole('option', { name: '自定义 · 本地测试' })).toBeTruthy();
+    expectCustomLayoutInMenu('本地测试');
     expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toContain('本地测试');
 
     first.unmount();
     render(<KlotskiPage />);
-    expect(screen.getByRole('option', { name: '自定义 · 本地测试' })).toBeTruthy();
+    expectCustomLayoutInMenu('本地测试');
   });
 
   test('游玩界面不显示编码功能，编辑器可导出当前草稿并解析编码', () => {
@@ -88,7 +93,7 @@ describe('关卡编辑器', () => {
     expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /保存关卡/ }));
-    expect(screen.getByRole('option', { name: '自定义 · 编码导入测试' })).toBeTruthy();
+    expectCustomLayoutInMenu('编码导入测试');
     expect(globalThis.localStorage.getItem(CUSTOM_LAYOUTS_STORAGE_KEY)).toContain('编码导入测试');
   });
 

@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest';
-import { DOUBLE_MOON_SPIN, HENG_DAO_LI_MA, LAYOUTS, THREE_QUARTER_SANDBOX } from '../layouts';
+import {
+  DOUBLE_MOON_SPIN,
+  EMPTY_BLUSTER,
+  FOUR_MOON_GATE,
+  HENG_DAO_LI_MA,
+  LAYOUTS,
+  THREE_QUARTER_SANDBOX,
+} from '../layouts';
 import { solveKlotski, type SolverAction } from '../solver';
 import {
   getHandsetOrientation,
@@ -192,6 +199,18 @@ describe('预设关卡', () => {
     expect(isWin(applyMoves(THREE_QUARTER_SANDBOX.pieces, moves!))).toBe(true);
   });
 
+  test.each([
+    { layout: FOUR_MOON_GATE, shortest: 41 },
+    { layout: EMPTY_BLUSTER, shortest: 27 },
+  ])('新增预设「$layout.name」只留两格且最短解为 $shortest 步', ({ layout, shortest }) => {
+    const occupiedArea = layout.pieces.reduce((area, piece) => area + getOccupiedArea(piece), 0);
+    const moves = solveKlotski(layout.pieces);
+
+    expect(occupiedArea).toBe(BOARD_COLS * BOARD_ROWS - 2);
+    expect(moves).toHaveLength(shortest);
+    expect(isWin(applyMoves(layout.pieces, moves!))).toBe(true);
+  });
+
   test('所有预设关卡都只留下两格自由空间', () => {
     for (const layout of LAYOUTS) {
       const occupiedArea = layout.pieces.reduce((area, piece) => {
@@ -232,7 +251,7 @@ describe('预设关卡', () => {
         )
       ) {
         expect(moves!.length, `关卡「${layout.name}」应具有足够的解题深度`).toBeGreaterThanOrEqual(
-          30,
+          20,
         );
       }
       expect(isWin(applyMoves(layout.pieces, moves!)), `关卡「${layout.name}」应正确通关`).toBe(

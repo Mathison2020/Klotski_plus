@@ -42,8 +42,8 @@ vi.mock('@/components/ui', () => ({
 }));
 
 function selectLayout(name: string) {
-  const option = screen.getByRole('option', { name }) as HTMLOptionElement;
-  fireEvent.change(screen.getByRole('combobox'), { target: { value: option.value } });
+  fireEvent.click(screen.getByRole('combobox', { name: '选择关卡' }));
+  fireEvent.click(screen.getByRole('option', { name }));
 }
 
 describe('自动演示动画队列', () => {
@@ -56,6 +56,18 @@ describe('自动演示动画队列', () => {
     cleanup();
     vi.useRealTimers();
     vi.restoreAllMocks();
+  });
+
+  test('关卡菜单按传统与异形关卡分成两列', () => {
+    render(<KlotskiPage />);
+    fireEvent.click(screen.getByRole('combobox', { name: '选择关卡' }));
+
+    const listbox = screen.getByRole('listbox', { name: '关卡列表' });
+    expect(listbox.className).toContain('grid-cols-2');
+    expect(screen.getByRole('group', { name: '传统华容道' }).textContent).toContain('横刀立马');
+    const variantGroup = screen.getByRole('group', { name: '异形块关卡' });
+    expect(variantGroup.textContent).toContain('月满重门');
+    expect(variantGroup.textContent).toContain('虚张声势');
   });
 
   test('连续播放等待平移动画结束后才开始下一次旋转', () => {
