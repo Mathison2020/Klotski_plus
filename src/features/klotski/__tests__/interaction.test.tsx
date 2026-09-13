@@ -223,4 +223,63 @@ describe('半圆块交互', () => {
     expect(screen.getByLabelText('3/4圆块').style.top).toBe('20%');
     expect(screen.getByText(/步数 2/)).toBeTruthy();
   });
+
+  test('工具栏旋转按钮播放动画后再提交半圆朝向', () => {
+    vi.useFakeTimers();
+    render(<KlotskiPage />);
+    selectLayout('峰回路转');
+
+    const half = screen.getByLabelText('半圆块');
+    fireEvent.pointerDown(half, { button: 0, clientX: 150, clientY: 450, pointerId: 10 });
+    fireEvent.pointerUp(half, { button: 0, clientX: 150, clientY: 450, pointerId: 10 });
+
+    const clockwise = screen.getByRole('button', { name: '顺时针旋转棋块' });
+    expect(clockwise.parentElement?.className).toContain('grid-cols-10');
+    expect(clockwise.parentElement?.children).toHaveLength(10);
+    fireEvent.click(clockwise);
+
+    act(() => vi.advanceTimersByTime(80));
+    expect(half.style.transform).not.toBe('rotate(90deg)');
+    expect(half.style.transform).not.toBe('rotate(180deg)');
+    expect(half.style.transitionProperty).toBe('none');
+
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.getByLabelText('半圆块').style.transform).toBe('rotate(180deg)');
+    expect(screen.getByText(/步数 1/)).toBeTruthy();
+  });
+
+  test('听筒可通过工具栏按钮沿拐角逆时针转出并顺时针转回', () => {
+    vi.useFakeTimers();
+    render(<KlotskiPage />);
+    selectLayout('辗转腾挪');
+
+    let handset = screen.getByLabelText('电话听筒块');
+    fireEvent.pointerDown(handset, { button: 0, clientX: 250, clientY: 450, pointerId: 11 });
+    fireEvent.pointerUp(handset, { button: 0, clientX: 250, clientY: 450, pointerId: 11 });
+
+    fireEvent.click(screen.getByRole('button', { name: '逆时针旋转棋块' }));
+    act(() => vi.advanceTimersByTime(80));
+    expect(handset.style.transform).not.toBe('rotate(0deg)');
+    expect(handset.style.transform).not.toBe('rotate(-90deg)');
+    expect(handset.style.left).not.toBe('25%');
+    expect(handset.style.left).not.toBe('50%');
+
+    act(() => vi.advanceTimersByTime(200));
+    handset = screen.getByLabelText('电话听筒块');
+    expect(handset.style.transform).toBe('rotate(-90deg)');
+    expect(handset.style.left).toBe('50%');
+    expect(handset.style.top).toBe('60%');
+
+    fireEvent.click(screen.getByRole('button', { name: '顺时针旋转棋块' }));
+    act(() => vi.advanceTimersByTime(80));
+    expect(handset.style.transform).not.toBe('rotate(-90deg)');
+    expect(handset.style.transform).not.toBe('rotate(0deg)');
+
+    act(() => vi.advanceTimersByTime(200));
+    handset = screen.getByLabelText('电话听筒块');
+    expect(handset.style.transform).toBe('rotate(0deg)');
+    expect(handset.style.left).toBe('25%');
+    expect(handset.style.top).toBe('80%');
+    expect(screen.getByText(/步数 2/)).toBeTruthy();
+  });
 });

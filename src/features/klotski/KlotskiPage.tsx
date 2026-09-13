@@ -7,6 +7,7 @@ import {
 } from 'react';
 import {
   ArrowCounterClockwiseIcon,
+  ArrowsCounterClockwiseIcon,
   ArrowsClockwiseIcon,
   CaretLeftIcon,
   CaretRightIcon,
@@ -170,6 +171,29 @@ function replay(initial: Piece[], solution: SolverAction[], upto: number): Piece
   return board;
 }
 
+/** 解析工具栏旋转按钮对应的合法目标；听筒的旋转方向同时决定转过哪一端。 */
+function resolveButtonRotation(
+  pieces: Piece[],
+  id: string,
+  direction: RotationDirection,
+): { next: Piece[]; target: Piece } | null {
+  const piece = pieces.find((candidate) => candidate.id === id);
+  if (!piece) return null;
+
+  let next: Piece[] | null = null;
+  if (piece.type === PieceType.HANDSET) {
+    const pivot = (['start', 'end'] as const).find(
+      (candidate) => handsetTurnDirection(piece, candidate) === direction,
+    );
+    if (pivot) next = turnHandset(pieces, id, pivot, direction);
+  } else {
+    next = rotatePiece(pieces, id, direction);
+  }
+
+  const target = next?.find((candidate) => candidate.id === id);
+  return next && target ? { next, target } : null;
+}
+
 /** 华容道页面：连续拖动移动、点击高亮、关卡切换、一键求解演示（可调速/暂停/步进/拖进度条）。 */
 export function KlotskiPage() {
   const [customLayouts, setCustomLayouts] = useState<CustomLayout[]>(loadCustomLayouts);
@@ -199,11 +223,11 @@ export function KlotskiPage() {
   const [deleteArmed, setDeleteArmed] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
-  const cornerSnapCancelRef = useRef<(() => void) | null>(null);
+  const rotationSnapCancelRef = useRef<(() => void) | null>(null);
 
   useEffect(
     () => () => {
-      cornerSnapCancelRef.current?.();
+      rotationSnapCancelRef.current?.();
     },
     [],
   );
@@ -220,7 +244,24 @@ export function KlotskiPage() {
   );
 
   const won = isWin(boardPieces) && activeDemoStep === null;
-  const selectedPiece = selectedId ? pieces.find((p) => p.id === selectedId) : null;
+  const selectedPiece = selectedId ? boardPieces.find((p) => p.id === selectedId) : null;
+  const selectedPieceCanRotate =
+    selectedPiece?.type === PieceType.HALF_DISC ||
+    selectedPiece?.type === PieceType.THREE_QUARTER_DISC ||
+    selectedPiece?.type === PieceType.HANDSET;
+  const buttonRotationAvailable = useMemo(
+    () => ({
+      clockwise:
+        selectedId !== null &&
+        selectedPieceCanRotate &&
+        resolveButtonRotation(boardPieces, selectedId, 'clockwise') !== null,
+      counterclockwise:
+        selectedId !== null &&
+        selectedPieceCanRotate &&
+        resolveButtonRotation(boardPieces, selectedId, 'counterclockwise') !== null,
+    }),
+    [boardPieces, selectedId, selectedPieceCanRotate],
+  );
   const moveAnimationMs = Math.max(speedMs, 60);
 
   // 连续播放与“下一步”共用同一条动画队列；任何时刻只允许一个动作在执行。
@@ -284,10 +325,7 @@ export function KlotskiPage() {
           setRotationPreview({
             id: applied.id,
             degrees:
-              (action.direction === 'clockwise' ? 1 : -1) *
-              (movingForward ? 1 : -1) *
-              eased *
-              90,
+              (action.direction === 'clockwise' ? 1 : -1) * (movingForward ? 1 : -1) * eased * 90,
             target: action.kind === 'corner-turn' ? targetPiece : undefined,
           });
           if (progress < 1) {
@@ -364,16 +402,46 @@ export function KlotskiPage() {
   };
 
   const rotateSelected = (direction: RotationDirection = 'clockwise') => {
-    if (selectedId === null || playing || activeDemoStep) return;
-    const rotated = rotatePiece(pieces, selectedId, direction);
-    if (!rotated) return;
-    setPieces(rotated);
-    setRender(toRenderPos(rotated));
-    setSteps((n) => n + 1);
+    if (selectedId === null || playing || activeDemoStep || rotationSnapCancelRef.current) return;
+    const sourcePieces = boardPieces;
+    const resolved = resolveButtonRotation(sourcePieces, selectedId, direction);
+    if (!resolved) return;
+
+    const source = sourcePieces.find((piece) => piece.id === selectedId);
+    if (!source) return;
+    const isHandset = source.type === PieceType.HANDSET;
+    const targetDegrees = direction === 'clockwise' ? 90 : -90;
+    setRotationPreview({
+      id: selectedId,
+      degrees: 0,
+      target: isHandset ? resolved.target : undefined,
+    });
+    rotationSnapCancelRef.current = animateAngleSnap({
+      from: 0,
+      to: targetDegrees,
+      onFrame: (degrees) =>
+        setRotationPreview({
+          id: selectedId,
+          degrees,
+          target: isHandset ? resolved.target : undefined,
+        }),
+      onComplete: () => {
+        rotationSnapCancelRef.current = null;
+        setSolution(null);
+        setDemoStart(null);
+        setPlayIndex(0);
+        setPendingSingleStep(false);
+        setActiveDemoStep(null);
+        setPieces(resolved.next);
+        setRender(toRenderPos(resolved.next));
+        setRotationPreview(null);
+        setSteps((count) => count + 1);
+      },
+    });
   };
 
   const handlePointerDown = (e: ReactPointerEvent<HTMLDivElement>, piece: Piece) => {
-    if (playing || activeDemoStep || cornerSnapCancelRef.current) return;
+    if (playing || activeDemoStep || rotationSnapCancelRef.current) return;
     const wantsPieceRotation =
       e.button === 2 &&
       (piece.type === PieceType.HALF_DISC || piece.type === PieceType.THREE_QUARTER_DISC);
@@ -586,7 +654,7 @@ export function KlotskiPage() {
       }
 
       const finish = () => {
-        cornerSnapCancelRef.current = null;
+        rotationSnapCancelRef.current = null;
         if (next) {
           setPieces(next);
           setRender(toRenderPos(next));
@@ -595,7 +663,7 @@ export function KlotskiPage() {
         setRotationPreview(null);
         setDraggingId(null);
       };
-      cornerSnapCancelRef.current = animateAngleSnap({
+      rotationSnapCancelRef.current = animateAngleSnap({
         from: drag.degrees,
         to: targetDegrees,
         onFrame: (degrees) => setRotationPreview({ id: drag.id, degrees, target: option.target }),
@@ -652,8 +720,8 @@ export function KlotskiPage() {
   const loadLayout = (idx: number) => {
     const layout = layouts[idx];
     if (!layout) return;
-    cornerSnapCancelRef.current?.();
-    cornerSnapCancelRef.current = null;
+    rotationSnapCancelRef.current?.();
+    rotationSnapCancelRef.current = null;
     setLayoutIdx(idx);
     setSolution(null);
     setDemoStart(null);
@@ -849,70 +917,98 @@ export function KlotskiPage() {
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={() => stepBy(-1)}
-              disabled={solution === null || playIndex <= 0 || activeDemoStep !== null}
-              aria-label="上一步"
-            >
-              <CaretLeftIcon size={16} />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={togglePlay}
-              disabled={activeDemoStep !== null && !playing}
-              aria-label={playing ? '暂停演示' : solution === null ? '开始演示' : '继续演示'}
-            >
-              {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
-            </Button>
-            <Button
-              variant="outline"
-              size="icon-sm"
-              onClick={() => stepBy(1)}
-              disabled={solution === null || playIndex >= total || activeDemoStep !== null}
-              aria-label="下一步"
-            >
-              <CaretRightIcon size={16} />
-            </Button>
-          </div>
+        <div className="grid w-full grid-cols-10 gap-1">
+          <Button
+            className="min-w-0 px-0"
+            variant="outline"
+            size="xs"
+            onClick={() => stepBy(-1)}
+            disabled={
+              solution === null ||
+              playIndex <= 0 ||
+              activeDemoStep !== null ||
+              rotationPreview !== null
+            }
+            aria-label="上一步"
+          >
+            <CaretLeftIcon size={16} />
+          </Button>
+          <Button
+            className="min-w-0 px-0"
+            variant="outline"
+            size="xs"
+            onClick={togglePlay}
+            disabled={(activeDemoStep !== null && !playing) || rotationPreview !== null}
+            aria-label={playing ? '暂停演示' : solution === null ? '开始演示' : '继续演示'}
+          >
+            {playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+          </Button>
+          <Button
+            className="min-w-0 px-0"
+            variant="outline"
+            size="xs"
+            onClick={() => stepBy(1)}
+            disabled={
+              solution === null ||
+              playIndex >= total ||
+              activeDemoStep !== null ||
+              rotationPreview !== null
+            }
+            aria-label="下一步"
+          >
+            <CaretRightIcon size={16} />
+          </Button>
 
-          <div className="flex items-center gap-1">
-            {SPEEDS.map((s) => (
-              <Button
-                key={s.ms}
-                variant={speedMs === s.ms ? 'default' : 'outline'}
-                size="xs"
-                onClick={() => setSpeedMs(s.ms)}
-                disabled={activeDemoStep !== null}
-              >
-                {s.label}
-              </Button>
-            ))}
-          </div>
+          {SPEEDS.map((s) => (
+            <Button
+              className="min-w-0 px-0"
+              key={s.ms}
+              variant={speedMs === s.ms ? 'default' : 'outline'}
+              size="xs"
+              onClick={() => setSpeedMs(s.ms)}
+              disabled={activeDemoStep !== null || rotationPreview !== null}
+            >
+              {s.label}
+            </Button>
+          ))}
 
           <Button
+            className="min-w-0 px-0"
             variant="outline"
-            size="icon-sm"
+            size="xs"
+            onClick={() => rotateSelected('counterclockwise')}
+            disabled={
+              !buttonRotationAvailable.counterclockwise ||
+              playing ||
+              activeDemoStep !== null ||
+              rotationPreview !== null
+            }
+            aria-label="逆时针旋转棋块"
+            title="逆时针旋转选中的异形块；听筒会滑过对应拐角"
+          >
+            <ArrowsCounterClockwiseIcon size={16} />
+          </Button>
+          <Button
+            className="min-w-0 px-0"
+            variant="outline"
+            size="xs"
             onClick={() => rotateSelected('clockwise')}
             disabled={
-              (selectedPiece?.type !== PieceType.HALF_DISC &&
-                selectedPiece?.type !== PieceType.THREE_QUARTER_DISC) ||
+              !buttonRotationAvailable.clockwise ||
               playing ||
-              activeDemoStep !== null
+              activeDemoStep !== null ||
+              rotationPreview !== null
             }
             aria-label="顺时针旋转棋块"
-            title="顺时针旋转选中的半圆或3/4圆（也可按住右键环绕拖动）"
+            title="顺时针旋转选中的异形块；听筒会滑过对应拐角"
           >
             <ArrowsClockwiseIcon size={16} />
           </Button>
 
           <Button
+            className="min-w-0 px-0"
             variant="outline"
-            size="icon-sm"
+            size="xs"
             onClick={reset}
             aria-label="重新开始"
             title="重新开始"
