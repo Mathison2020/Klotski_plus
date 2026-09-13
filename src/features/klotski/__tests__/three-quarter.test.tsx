@@ -90,6 +90,8 @@ describe('3/4圆块渲染', () => {
     expect(element.className).toContain('pointer-events-none');
     const path = element.querySelector('path')!;
     expect(path.classList.contains('pointer-events-auto')).toBe(true);
+    expect(path.getAttribute('d')).toContain('V10 Q100 2 92 2');
+    expect(path.getAttribute('d')).toContain('198 108 Q198 100 190 100');
     expect(path.getAttribute('d')).toContain('Q100 100 100 88');
     expect(path.getAttribute('stroke')).toBe('var(--ring)');
     expect(path.getAttribute('stroke-width')).toBe('2');

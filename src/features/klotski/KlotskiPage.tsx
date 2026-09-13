@@ -961,7 +961,7 @@ export function KlotskiPage() {
 
           {SPEEDS.map((s) => (
             <Button
-              className="min-w-0 px-0"
+              className="min-w-0 px-0 !text-[10px] leading-none"
               key={s.ms}
               variant={speedMs === s.ms ? 'default' : 'outline'}
               size="xs"
